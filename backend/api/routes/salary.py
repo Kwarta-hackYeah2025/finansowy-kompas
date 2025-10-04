@@ -13,7 +13,7 @@ async def calculate_salary_endpoint(payload: SalaryRequest) -> SalaryResponse:
     retirement_age = payload.career_end
     years_to_retirement = max(0, retirement_age - payload.age)
 
-    salary_dec = await calculate_salary(payload.industry, payload.city, experience_years)
+    salary_dec, alpha, beta = await calculate_salary(payload.industry, payload.city, experience_years)
     salary = float(salary_dec)
 
     return SalaryResponse(
@@ -21,4 +21,6 @@ async def calculate_salary_endpoint(payload: SalaryRequest) -> SalaryResponse:
         experience_years=experience_years,
         retirement_age=retirement_age,
         years_to_retirement=years_to_retirement,
+        alpha=alpha,
+        beta=beta,
     )

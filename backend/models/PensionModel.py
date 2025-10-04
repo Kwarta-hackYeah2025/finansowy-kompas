@@ -4,10 +4,10 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, computed_field
 
-from models.calculate_salary.experience_multiplier import experience_multiplier
-from models.pension_models.MacroeconomicFactors import MacroeconomicFactors
-from models.pension_models.RetirementAgeConfig import RetirementAgeConfig
-from models.pension_models.ZUSContributionRates import ZUSContributionRates
+from backend.models.calculate_salary.experience_multiplier import experience_multiplier
+from backend.models.pension_models.MacroeconomicFactors import MacroeconomicFactors
+from backend.models.pension_models.RetirementAgeConfig import RetirementAgeConfig
+from backend.models.pension_models.ZUSContributionRates import ZUSContributionRates
 
 
 class PensionModel(BaseModel):

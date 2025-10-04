@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Optional
+from typing import List
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -67,3 +68,40 @@ class SalaryResponse(BaseModel):
     experience_years: int = Field(..., description="Years of professional experience")
     retirement_age: int = Field(..., description="Retirement age used (could be user-provided or default by sex)")
     years_to_retirement: int = Field(..., description="Years remaining to retirement (floored at 0)")
+    alpha: float = Field(..., description="Alpha parameter used in experience multiplier model")
+    beta: float = Field(..., description="Beta parameter used in experience multiplier model")
+
+
+class PensionPreviewRequest(BaseModel):
+    current_age: int = Field(..., ge=0, le=120, description="Current age in years")
+    years_of_experience: int = Field(..., ge=0, le=100, description="Years of work experience")
+    current_monthly_salary: float = Field(..., ge=0, description="Current monthly gross salary (PLN)")
+    is_male: bool = Field(True, description="Gender flag; True = male, False = female")
+    alpha: float = Field(..., description="Alpha parameter for experience multiplier model")
+    beta: float = Field(..., description="Beta parameter for experience multiplier model")
+    retirement_age: Optional[int] = Field(
+        None,
+        ge=0,
+        le=120,
+        description="Optional custom retirement age; if omitted, standard age is used",
+    )
+
+
+class TimelinePoint(BaseModel):
+    year: int
+    i_pillar: float
+    ii_pillar: float
+    total: float
+    annual_salary: float
+
+
+class PensionPreviewResponse(BaseModel):
+    retirement_age: int
+    years_to_retirement: int
+    monthly_pension: float
+    replacement_rate_percent: float
+    i_pillar_capital: float
+    ii_pillar_capital: float
+    total_capital: float
+    current_monthly_salary: float
+    timeline: List[TimelinePoint]
