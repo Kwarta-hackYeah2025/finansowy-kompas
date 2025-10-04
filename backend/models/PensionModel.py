@@ -4,7 +4,9 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, computed_field
 
+from llm.random_nonfunctional_periods import NonFunctionalEvent
 from models.calculate_salary.experience_multiplier import experience_multiplier
+from models.nonfunctional_periods.generate_periods import generate_periods
 from models.pension_models.MacroeconomicFactors import MacroeconomicFactors
 from models.pension_models.RetirementAgeConfig import RetirementAgeConfig
 from models.pension_models.ZUSContributionRates import ZUSContributionRates
@@ -38,6 +40,8 @@ class PensionModel(BaseModel):
         default=Decimal("0"),
         description="Already accumulated capital in II filar (subkonto)",
     )
+    non_functional_events: list[NonFunctionalEvent] = Field(default_factory=list,
+                                             description="`Periods of absence/reduction of contribution base for E+R")
 
     def salary_in_the_past_or_future(
         self, current_salary: Decimal, year_delta: int
@@ -98,6 +102,34 @@ class PensionModel(BaseModel):
         """Actual retirement age (custom or standard)"""
         config = RetirementAgeConfig()
         return self.retirement_age or config.get_retirement_age(self.is_male)
+
+    @property
+    def birth_year(self) -> int:
+        return self.current_year - self.current_age
+
+    def age_in_year(self, year: int) -> int:
+        """Age in a given calendar year."""
+        return year - self.birth_year
+
+    def contribution_multiplier_for_age(self, age: int) -> Decimal:
+        """
+        Returns the final contribution base multiplier for a given age.
+        Rules:
+        - if anything has basis_zero=True and covers the age -> 0
+        - otherwise, we take the minimum of contribution_multiplier for all covering events
+        - if no events -> 1
+        """
+
+        applicable = [e for e in self.non_functional_events if e.start_age <= age < e.end_age]
+        if not applicable:
+            return Decimal("1")
+
+        if any(e.basis_zero for e in applicable):
+            return Decimal("0")
+
+        min_m = min(e.contrib_multiplier for e in applicable)
+        return Decimal(str(min_m))
+
 
     def calculate_annual_contribution_i_pillar(self, gross_salary: Decimal) -> Decimal:
         """
@@ -217,44 +249,46 @@ class PensionModel(BaseModel):
 
     def reconstruct_historical_contributions(self) -> tuple[Decimal, Decimal]:
         """
-        Reconstruct and valorize/index all past contributions from work_start_year
-        to current_year
+           Reconstructs and valorizes/indexes all past E+R (pension + disability) contributions
+           from work_start_year up to current_year, also accounting for periods of breaks
+           or reduced work activity.
 
-        For each past year:
-        1. Estimate salary based on experience curve
-        2. Calculate contributions
-        3. Valorize/index from that year to present
-        4. Sum all valorized contributions
+           For each year:
+             1. Estimate the nominal salary using the experience curve.
+             2. Check if any event applies at that age:
+                - if basis_zero == True → contributions for that year = 0 (skipped),
+                - if contrib_multiplier < 1 → the contribution base is proportionally reduced.
+             3. Calculate I-pillar and II-pillar contributions from the adjusted base.
+             4. Valorize (I-pillar) / index (II-pillar) those contributions from that year
+                up to current_year.
+             5. Add the results to the totals.
 
-        Returns:
-            (total_i_pillar_valorized, total_ii_pillar_indexed)
-        """
+           Returns:
+               (total_i_pillar_valorized, total_ii_pillar_indexed) —
+               total valorized/indexed contributions to I and II pillars as of the current year.
+           """
         total_i_pillar = Decimal("0")
         total_ii_pillar = Decimal("0")
 
-        # Loop through each year of work history
         for year in range(self.work_start_year, self.current_year):
-            # Calculate how many years ago this was
             year_delta = year - self.current_year
-
-            # Estimate salary for that year
             salary_then = self.salary_in_the_past_or_future(
                 year_delta=year_delta, current_salary=self.current_salary
             )
 
-            # Calculate contributions for that year
-            i_contribution = self.calculate_annual_contribution_i_pillar(salary_then)
-            ii_contribution = self.calculate_annual_contribution_ii_pillar(salary_then)
+            age_then = self.age_in_year(year)
+            base_mult = self.contribution_multiplier_for_age(age_then)
+            if base_mult == 0:
+                continue
 
-            # Valorize/index from contribution year to current year
-            i_valorized = self.valorize_i_pillar_capital(
-                i_contribution, year, self.current_year
-            )
-            ii_indexed = self.index_ii_pillar_capital(
-                ii_contribution, year, self.current_year
-            )
+            adjusted_salary = salary_then * base_mult
 
-            # Add to totals
+            i_contribution = self.calculate_annual_contribution_i_pillar(adjusted_salary)
+            ii_contribution = self.calculate_annual_contribution_ii_pillar(adjusted_salary)
+
+            i_valorized = self.valorize_i_pillar_capital(i_contribution, year, self.current_year)
+            ii_indexed = self.index_ii_pillar_capital(ii_contribution, year, self.current_year)
+
             total_i_pillar += i_valorized
             total_ii_pillar += ii_indexed
 
@@ -262,47 +296,49 @@ class PensionModel(BaseModel):
 
     def project_future_accumulation(self) -> tuple[Decimal, Decimal]:
         """
-        Project future I and II pillar accumulation from the current year until retirement
+        Project future E+R (pension + disability) accumulation from the current year
+        up to (but excluding) the retirement year, taking into account non-functional
+        events that reduce or zero out the contribution base.
 
         For each future year:
-        1. Project salary based on the experience multiplier model
-        2. Calculate contributions
-        3. Valorize/index from contribution year to retirement year
-        4. Sum all future contributions
+          1) Estimate the nominal annual salary from the experience curve.
+          2) Check events for the person's age in that year:
+             - if basis_zero == True → no E+R title → contributions for that year are skipped,
+             - else apply contrib_multiplier ∈ [0, 1] to reduce the contribution base.
+          3) Compute I-pillar and II-pillar contributions from the adjusted base.
+          4) Valorize (I-pillar) / index (II-pillar) the contributions from that year
+             to the retirement year.
+          5) Add to the running totals.
 
         Returns:
             (total_i_pillar_at_retirement, total_ii_pillar_at_retirement)
+            — totals at the retirement year, after valorization/indexation.
         """
         total_i_pillar = Decimal("0")
         total_ii_pillar = Decimal("0")
 
         retirement_year = self.current_year + self.years_to_standard_retirement
 
-        # Loop through each future working year
         for year in range(self.current_year, retirement_year):
-            # Calculate years from now
             year_delta = year - self.current_year
-
-            # Project salary for that year
             salary_future = self.salary_in_the_past_or_future(
                 year_delta=year_delta, current_salary=self.current_salary
             )
 
-            # Calculate contributions
-            i_contribution = self.calculate_annual_contribution_i_pillar(salary_future)
-            ii_contribution = self.calculate_annual_contribution_ii_pillar(
-                salary_future
-            )
+            # NOWE: mnożnik/wyzerowanie podstawy wg wieku
+            age_then = self.age_in_year(year)
+            base_mult = self.contribution_multiplier_for_age(age_then)
+            if base_mult == 0:
+                continue
 
-            # Valorize/index from contribution year to retirement
-            i_valorized = self.valorize_i_pillar_capital(
-                i_contribution, year, retirement_year
-            )
-            ii_indexed = self.index_ii_pillar_capital(
-                ii_contribution, year, retirement_year
-            )
+            adjusted_salary = salary_future * base_mult
 
-            # Add to totals
+            i_contribution = self.calculate_annual_contribution_i_pillar(adjusted_salary)
+            ii_contribution = self.calculate_annual_contribution_ii_pillar(adjusted_salary)
+
+            i_valorized = self.valorize_i_pillar_capital(i_contribution, year, retirement_year)
+            ii_indexed = self.index_ii_pillar_capital(ii_contribution, year, retirement_year)
+
             total_i_pillar += i_valorized
             total_ii_pillar += ii_indexed
 
@@ -442,74 +478,76 @@ class PensionModel(BaseModel):
 
     def get_cumulative_capital_by_year(self) -> dict[int, dict]:
         """
-        Calculate cumulative pension capital for each year from current to retirement.
-        This is used for timeline visualization (MODUŁ 6).
+        Build a year-by-year cumulative view of pension capital from the current year
+        through the retirement year (inclusive), suitable for timeline visualization.
 
-        For each year Y from current_year to retirement_year:
-        - Calculate all contributions from work_start_year to Y
-        - Valorize/index them to year Y
-        - Return accumulated totals
+        For each target year Y in [current_year, retirement_year]:
+          - Iterate over every contribution_year from work_start_year to Y-1:
+            1) Estimate the nominal salary for contribution_year from the experience curve.
+            2) Check events for the age in contribution_year:
+               * if basis_zero == True → skip contributions for that year,
+               * else apply contrib_multiplier ∈ [0, 1] to reduce the contribution base.
+            3) Compute I-pillar and II-pillar contributions from the adjusted base.
+            4) Valorize (I-pillar) / index (II-pillar) those contributions up to Y.
+            5) Accumulate into totals for Y.
+          - Additionally compute:
+            * annual_salary for Y (nominal salary estimate for that year, before any event-based
+              reduction),
+            * contrib_base_multiplier for Y (the multiplier that would apply in Y, useful for UI).
 
         Returns:
-            Dictionary mapping year → {
-                'age': int,
-                'i_pillar': Decimal,
-                'ii_pillar': Decimal,
-                'total': Decimal,
-                'annual_salary': Decimal,
-                'years_of_experience': int
-            }
+            A dict mapping:
+                year → {
+                    "i_pillar": Decimal,              # cumulative I-pillar capital at year
+                    "ii_pillar": Decimal,             # cumulative II-pillar capital at year
+                    "total": Decimal,                 # i_pillar + ii_pillar
+                    "annual_salary": Decimal,         # nominal salary estimate for that year
+                    "contrib_base_multiplier": Decimal  # event-based base multiplier for that year
+                }
         """
         timeline = {}
         retirement_year = self.current_year + self.years_to_standard_retirement
 
-        # For each year from current to retirement
         for target_year in range(self.current_year, retirement_year + 1):
             i_pillar_total = Decimal("0")
             ii_pillar_total = Decimal("0")
 
-            # Calculate contributions from all past working years up to target_year
-            # (includes both historical and future-relative-to-now years)
             for contribution_year in range(self.work_start_year, target_year):
-                # Calculate year delta for salary estimation
                 year_delta = contribution_year - self.current_year
-
-                # Estimate salary for that year
                 salary = self.salary_in_the_past_or_future(
                     year_delta=year_delta, current_salary=self.current_salary
                 )
 
-                # Calculate contributions
-                i_contribution = self.calculate_annual_contribution_i_pillar(salary)
-                ii_contribution = self.calculate_annual_contribution_ii_pillar(salary)
+                # NOWE: mnożnik/wyzerowanie podstawy wg wieku
+                age_then = self.age_in_year(contribution_year)
+                base_mult = self.contribution_multiplier_for_age(age_then)
+                if base_mult == 0:
+                    continue
+                adjusted_salary = salary * base_mult
 
-                # Valorize/index from contribution year to target year
-                i_valorized = self.valorize_i_pillar_capital(
-                    i_contribution, contribution_year, target_year
-                )
-                ii_indexed = self.index_ii_pillar_capital(
-                    ii_contribution, contribution_year, target_year
-                )
+                i_contribution = self.calculate_annual_contribution_i_pillar(adjusted_salary)
+                ii_contribution = self.calculate_annual_contribution_ii_pillar(adjusted_salary)
 
-                # Add to totals for this target year
+                i_valorized = self.valorize_i_pillar_capital(i_contribution, contribution_year, target_year)
+                ii_indexed = self.index_ii_pillar_capital(ii_contribution, contribution_year, target_year)
+
                 i_pillar_total += i_valorized
                 ii_pillar_total += ii_indexed
 
-            # Calculate age and experience for this year
             years_since_current = target_year - self.current_year
-            age_at_year = self.current_age + years_since_current
-            experience_at_year = self.years_of_experience + years_since_current
-
-            # Get salary for this year
             salary_at_year = self.salary_in_the_past_or_future(
                 year_delta=years_since_current, current_salary=self.current_salary
             )
+
+            age_at_year = self.age_in_year(target_year)
+            base_mult_for_year = self.contribution_multiplier_for_age(age_at_year)
 
             timeline[target_year] = {
                 "i_pillar": i_pillar_total,
                 "ii_pillar": ii_pillar_total,
                 "total": i_pillar_total + ii_pillar_total,
                 "annual_salary": salary_at_year,
+                "contrib_base_multiplier": base_mult_for_year,
             }
 
         return timeline
@@ -533,17 +571,41 @@ class PensionModel(BaseModel):
         return timeline_list
 
 if __name__ == '__main__':
-    pension = PensionModel(
-        current_age=30,
-        years_of_experience=10,
-        current_salary=Decimal("30000"),
-        is_male=True,
-        alpha=0.02,
-        beta=0.02,
-        macroeconomic_factors=MacroeconomicFactors(
-            inflation_rate=Decimal("0.02"),
-            real_wage_growth_rate=Decimal("0.02"),
-            i_pillar_indexation_rate=Decimal("0.02"),
-            ii_pillar_indexation_rate=Decimal("0.02"),
+    import asyncio
+    async def main():
+        pension = PensionModel(
+            current_age=30,
+            years_of_experience=10,
+            current_salary=Decimal("30000"),
+            is_male=True,
+            alpha=0.02,
+            beta=0.02,
+            macroeconomic_factors=MacroeconomicFactors(
+                inflation_rate=Decimal("0.02"),
+                real_wage_growth_rate=Decimal("0.02"),
+                i_pillar_indexation_rate=Decimal("0.02"),
+                ii_pillar_indexation_rate=Decimal("0.02"),
+            ),
         )
-    )
+
+        birth_year = pension.current_year - pension.current_age
+
+        events = await generate_periods(birth_year=birth_year, current_year=pension.current_year)
+
+        pension.non_functional_events = events
+
+        print("=== Wygenerowane przerwy (LLM) ===")
+        for e in events:
+            print(f"- {e.reason} | wiek {e.start_age}–{e.end_age} | mnożnik składek {e.contrib_multiplier}")
+
+        total_i, total_ii = pension.calculate_total_retirement_capital()
+        monthly = pension.calculate_monthly_pension(total_i, total_ii)
+
+        print("\n=== Wyniki emerytalne ===")
+        print(f"I filar: {total_i:.2f}")
+        print(f"II filar: {total_ii:.2f}")
+        print(f"Suma: {(total_i + total_ii):.2f}")
+        print(f"Miesięczna emerytura: {monthly:.2f} PLN")
+
+
+    asyncio.run(main())
