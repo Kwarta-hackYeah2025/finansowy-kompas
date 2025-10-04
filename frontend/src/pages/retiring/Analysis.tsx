@@ -143,7 +143,7 @@ const Analysis = () => {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl bg-stone-50 rounded-t-xl mt-10">
+    <div className="mx-auto w-full max-w-5xl bg-stone-50 rounded-t-xl mt-2">
       <Card className="bg-stone-50 pt-0 pb-8">
         <CardHeader className="bg-white py-4 rounded-t-xl border-b ">
           <div className="flex items-center justify-between">
@@ -162,7 +162,7 @@ const Analysis = () => {
               <AnalysisTable data={current} backend={backend} />
             </div>
             <div className="flex flex-col gap-6">
-              <ChartContainer config={chartConfig} className="w-full aspect-[16/10]">
+              <ChartContainer config={chartConfig} className="w-full aspect-[16/16]">
                 <AreaChart data={points} margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
                   <defs>
                     <linearGradient id={gradSavings} x1="0" y1="0" x2="0" y2="1">

@@ -3,6 +3,8 @@ import ContactMailOutlinedIcon from '@mui/icons-material/ContactMailOutlined';
 import LiveHelpOutlinedIcon from '@mui/icons-material/LiveHelpOutlined';
 import ViewStreamOutlinedIcon from '@mui/icons-material/ViewStreamOutlined';
 import ElderlyOutlinedIcon from '@mui/icons-material/ElderlyOutlined';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import SavingsOutlinedIcon from '@mui/icons-material/SavingsOutlined';
 import { type ReactNode } from 'react';
 
 /**
@@ -18,6 +20,16 @@ export interface SideMenuItemType {
 }
 
 export const sideMenuItems: SideMenuItemType[] = [
+	{
+		path: '/informacje',
+		label: 'Informacje',
+		icon: <InfoOutlinedIcon />,
+	},
+	{
+		path: '/wartosc-pieniadza',
+		label: 'Wartość pieniądza',
+		icon: <SavingsOutlinedIcon />,
+	},
 	{
 		path: '/inflacja',
 		label: 'Inflacja',
