@@ -6,4 +6,3 @@ zespoł Kwarta
 - Kamil Żak
 - Karol Marszałek
 - Aleksander Kluska
-- 
