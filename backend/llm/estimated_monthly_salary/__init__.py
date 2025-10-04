@@ -1,0 +1,1 @@
+from .Salary import Salary # noqa
