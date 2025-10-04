@@ -10,7 +10,6 @@ router = APIRouter(prefix="/salary", tags=["salary"])
 async def calculate_salary_endpoint(payload: SalaryRequest) -> SalaryResponse:
     experience_years = max(0, payload.age - (payload.career_start or 23))
 
-    # Use career_end provided by the client or default derived from sex via schema validator
     retirement_age = payload.career_end
     years_to_retirement = max(0, retirement_age - payload.age)
 
