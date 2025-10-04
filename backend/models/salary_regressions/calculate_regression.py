@@ -3,10 +3,10 @@ import pandas as pd
 from scipy.optimize import curve_fit
 import logging
 
-from models.salary_regressions.experience_multiplier_function import (
+from backend.models.salary_regressions.experience_multiplier_function import (
     experience_multiplier_function,
 )
-from utils import use_cwd
+from backend.utils import use_cwd
 
 logger = logging.getLogger(__name__)
 

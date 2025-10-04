@@ -1,7 +1,7 @@
 import os.path
 import matplotlib.pyplot as plt
 
-from models.salary_regressions.classification.WageProgressionClassifier import (
+from backend.models.salary_regressions.classification.WageProgressionClassifier import (
     WageProgressionClassifier,
 )
 

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 
-from models.salary_regressions.data.regression_dict import regression_dict
+from backend.models.salary_regressions.data.regression_dict import regression_dict
 
 
 
