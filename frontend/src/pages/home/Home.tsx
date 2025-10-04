@@ -9,19 +9,19 @@ const Home = () => {
 	// warianty animacji dla przycisków
 	const slideUp = {
 		hidden: {opacity: 0, y: 100},
-		visible: (i: number) => ({
+		transition: (i: number) => ({
 			opacity: 1,
 			y: 0,
-			transition: {delay: i * 0.5, duration: 1, ease: "easeOut"},
+			delay: i * 0.5, duration: 1, ease: "easeOut"
 		}),
 	};
 
 	const slideDown = {
 		hidden: {opacity: 0, y: -100},
-		visible: (i: number) => ({
+		transition: (i: number) => ({
 			opacity: 1,
 			y: 0,
-			transition: {delay: i * 0.5, duration: 1, ease: "easeOut"},
+			delay: i * 0.5, duration: 1, ease: "easeOut"
 		}),
 	};
 
