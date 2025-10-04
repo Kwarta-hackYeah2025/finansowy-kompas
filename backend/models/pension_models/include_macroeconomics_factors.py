@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from models.macroeconomics.MacroeconomicFactors import MacroeconomicFactors
+from models.pension_models.MacroeconomicFactors import MacroeconomicFactors
 
 
 def include_macroeconomics_factors(
