@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field, computed_field
 
-from models.data.poland_historical_macro_data import poland_macro_data
+from backend.models.data.poland_historical_macro_data import poland_macro_data
 
 
 class MacroeconomicFactors(BaseModel):
