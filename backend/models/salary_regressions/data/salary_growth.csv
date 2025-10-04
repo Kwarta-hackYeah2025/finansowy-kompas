@@ -1,0 +1,160 @@
+Job_Description,0-2_Years,2-5_Years,5-10_Years,10-15_Years,20+_Years
+IT - Software Developer Frontend,6500,9500,13250,15000,17000
+IT - Software Developer Backend,7000,10000,14000,16000,18000
+IT - Data Scientist,7250,9000,12500,14250,17000
+IT - DevOps Engineer,8500,15750,24200,26500,30000
+IT - IT Architect,12000,16500,18000,21000,25000
+IT - CTO,20000,25000,30000,45000,65000
+IT - Network Engineer,7000,10500,14500,19000,25000
+IT - QA Engineer,6000,8500,11000,13500,16000
+IT - Product Manager,8000,12000,17000,22000,28000
+IT - Project Manager,7500,11000,15000,19000,24000
+Healthcare - Doctor General,10640,14083,18458,22083,25617
+Healthcare - Doctor Specialist,12250,16500,22000,26500,30750
+Healthcare - Doctor Surgeon,14000,19000,26000,32000,38000
+Healthcare - Doctor Private Practice,15000,22000,32000,42000,52000
+Healthcare - Nurse Registered,3000,4278,6087,7440,8532
+Healthcare - Nurse Master's Degree,3600,5134,7304,8928,10238
+Healthcare - Dentist,10000,13683,17925,21933,26000
+Healthcare - Dentist Private Practice,14000,20000,28000,35000,42000
+Healthcare - Pharmacist,6500,8500,11000,13500,16000
+Healthcare - Medical Specialist,8000,11000,15000,18500,22000
+Healthcare - Hospital Administrator,9000,12500,16500,20000,24000
+Research - Research Scientist,5833,8057,11450,13283,15625
+Research - University Professor,6840,8500,15000,19000,25000
+Research - Post-Doctoral Researcher,7000,9000,11500,13500,15500
+Finance - CFO/Finance Director,20000,25000,35000,42500,55000
+Finance - Financial Director,15000,20000,23000,30000,36000
+Finance - Financial Manager,10000,12000,15500,20000,25000
+Finance - Financial Analyst,9500,12500,14500,15500,16500
+Finance - Junior Financial Analyst,9000,10500,11500,12500,13500
+Finance - Chief Actuary,20000,25000,28000,33000,38000
+Finance - Risk Manager,12000,16000,26000,29000,32000
+Finance - Investment Banking Analyst,10000,12000,13500,14500,15500
+Finance - Private Banker,8000,12000,16000,18000,20000
+Finance - Senior Accountant,9750,11000,12500,13500,14500
+Finance - Accountant,7500,9000,10500,11500,12500
+Finance - Junior Accountant,6500,7500,8500,9500,10500
+Banking - Personal Banker,5882,8000,12000,15000,18000
+Banking - Account Manager,6000,8000,10500,13000,16000
+Banking - Bank Branch Manager,9000,12000,16000,19000,22000
+Legal - Lawyer Private Practice,8653,10742,14367,17058,20417
+Legal - Corporate In-House Counsel,17748,22000,27000,30000,32093
+Legal - Judge,13283,17000,22000,27000,31000
+Legal - Magistrate Judge,15000,19000,23000,27000,31000
+Legal - Legal Counsel Entry,10000,13000,16000,19000,22000
+Legal - Notary Public,12000,15000,19000,23000,28000
+Engineering - Mechanical Engineer,8000,11000,14000,16500,19000
+Engineering - Electrical Engineer,8000,11000,14000,16500,19000
+Engineering - Civil Engineer,7000,9500,13000,15500,18000
+Engineering - Chemical Engineer,8500,11500,15000,17500,20000
+Engineering - Aerospace Engineer,4488,7000,9288,11500,14350
+Engineering - Industrial Engineer,7500,10500,14000,16500,19000
+Engineering - Quality Engineer,7000,10000,13000,15500,18000
+Manufacturing - Factory Worker,5000,5500,6000,6500,7000
+Manufacturing - Manufacturing Engineer,8000,10500,13500,15500,17500
+Manufacturing - Plant Manager,8500,11000,17500,21000,25000
+Manufacturing - Production Supervisor,6500,8500,11000,13500,16000
+Manufacturing - Quality Control Inspector,5500,7000,9000,11000,13000
+Construction - Construction Worker,5000,6000,7000,7500,8000
+Construction - Construction Foreman,7000,8500,10000,11000,12000
+Construction - Architect,12000,15000,18000,20000,22000
+Construction - Structural Engineer,9000,12000,15500,18000,20500
+Energy - Power Plant Operator,7000,8500,10000,11500,12000
+Energy - Energy Engineer,9000,12000,15000,17500,19500
+Energy - Renewable Energy Specialist,10000,13000,16500,18500,20000
+Education - Primary Teacher,3100,5755,7252,7773,8247
+Education - Secondary Teacher,3400,6331,7977,8550,9071
+Education - University Assistant Professor,6840,8500,11500,14000,17000
+Education - University Professor,9370,13000,17929,21000,25000
+Education - School Principal Small,6500,7500,8500,9500,10500
+Education - School Principal Large,10000,12000,14000,15500,17000
+Education - Education Administrator,7000,9000,11500,13500,15500
+Civil Service - Entry Administrative,5120,6755,8910,10450,11690
+Civil Service - Mid-Level Specialist,6000,8000,10500,12500,14500
+Civil Service - Ministry Worker Entry,5000,6500,8500,10000,11500
+Civil Service - Ministry Senior Specialist,8000,10500,13500,16000,18500
+Retail - Cashier,4200,4700,5100,5400,5800
+Retail - Sales Associate,4500,5200,5800,6200,6600
+Retail - Store Manager,6000,8000,10500,12500,14500
+Retail - Retail Buyer,7000,9500,12500,15000,17500
+Sales - Sales Representative Base,5250,6000,7000,8000,10000
+Sales - Sales Representative Total,7500,9500,12000,14500,17000
+Sales - Account Manager,7500,9500,12000,14000,16000
+Hospitality - Restaurant Server Base,4800,5300,6000,6800,7800
+Hospitality - Restaurant Server with Tips,6000,7000,8500,10000,11000
+Hospitality - Bartender,5000,6000,7500,9000,10500
+Hospitality - Chef Commis,4500,5000,5500,6000,6500
+Hospitality - Chef de Partie,5500,6500,7500,8500,9500
+Hospitality - Sous Chef,7000,8500,10000,11500,13000
+Hospitality - Head Chef,9000,11000,13000,14500,16000
+Hospitality - Hotel Manager,7000,10000,15000,19000,23000
+Hospitality - Hotel Front Desk,4500,5200,6000,6800,7500
+Tourism - Tour Guide,5000,6000,7500,9500,13000
+Tourism - Travel Agent,5500,6500,8000,10000,12000
+Tourism - Tourism Manager,6000,9000,12500,16000,19000
+Transportation - Truck Driver Domestic,7000,8000,9000,10000,11000
+Transportation - Truck Driver International,8500,10000,11500,12500,14000
+Transportation - Bus Driver,5700,6500,7500,8500,11000
+Transportation - Taxi Driver,6000,7500,9000,10500,12000
+Transportation - Train Driver,7500,9000,11000,13000,15000
+Logistics - Warehouse Worker,5000,5600,6200,6800,7500
+Logistics - Forklift Operator,5500,6200,7000,7800,8500
+Logistics - Logistics Specialist,7000,8500,10500,12500,14500
+Logistics - Supply Chain Planner,8000,10000,13000,15500,18000
+Agriculture - Farm Worker Seasonal,4000,4300,4500,4700,5000
+Agriculture - Farm Worker Permanent,4500,5000,5500,6000,6500
+Agriculture - Farmer Small,1323,1752,2302,2873,3333
+Agriculture - Farmer Commercial,2500,4000,6000,8500,11000
+Agriculture - Agricultural Specialist,5500,7000,9000,11000,12500
+Agriculture - Agricultural Engineer,9368,11000,13304,15000,16503
+Agriculture - Farm Manager,5122,7085,9372,11450,13283
+Agriculture - Veterinarian,5153,6708,9127,10742,12675
+Real Estate - Real Estate Agent,4500,5280,7181,8689,9905
+Real Estate - Real Estate Agent Top Performer,8000,12000,18000,24000,30000
+Real Estate - Property Manager,8000,10500,13500,16000,18500
+Arts Media - Journalist,4500,5610,7630,8500,9500
+Arts Media - Journalist Financial,6000,8000,11000,13500,16000
+Arts Media - Graphic Designer Junior,5000,6000,7500,9000,11000
+Arts Media - Graphic Designer Senior,7000,9000,12000,14500,17600
+Arts Media - UX/UI Designer,7500,10000,14000,17500,21000
+Arts Media - Photographer,2570,3002,4487,5393,6062
+Arts Media - Photographer Commercial,5000,7000,10000,12500,15000
+Arts Media - Actor,5002,6633,8870,11217,12667
+Arts Media - Musician,3013,3627,5148,6152,6925
+Arts Media - Orchestra Musician,5000,6500,8000,9500,10000
+Arts Media - Video Editor,7413,9000,11500,13500,15500
+Arts Media - Media Producer,6500,7755,9500,11500,14000
+Arts Media - Content Creator,4000,6000,9000,12000,16000
+Arts Media - Marketing Specialist,5500,7000,9000,11500,14000
+Arts Media - Social Media Manager,5000,6500,8500,10500,13000
+Consulting - IT Consultant,11725,16335,20000,23000,26000
+Consulting - Management Consultant,11000,14000,18000,24000,32000
+Consulting - Management Consultant MBB,11250,15000,20000,26500,45000
+Consulting - Business Consultant,6500,7851,9500,11500,13500
+Consulting - SAP Consultant,8184,12000,15438,18500,22000
+Consulting - Project Manager Junior,8400,10000,12000,14000,16500
+Other - HR Specialist,6000,7500,9500,11500,13500
+Other - HR Manager,7500,10000,13500,17000,20000
+Other - Recruiter,5500,7000,9000,11000,13000
+Other - Administrative Assistant,4800,5500,6500,7500,8500
+Other - Executive Assistant,7000,9000,11500,14000,16500
+Other - Customer Service Representative,4500,5200,6000,6800,7500
+Other - Call Center Agent,4666,5200,5800,6400,7000
+Other - Security Guard,4800,5300,5800,6300,6800
+Other - Cleaner,4666,5000,5400,5700,6000
+Other - Translator,6000,7500,9500,12000,15000
+Other - Interpreter,7000,9000,12000,15000,18000
+Other - Librarian,5000,6000,7500,9000,10500
+Other - Social Worker,5500,6500,8000,9500,11000
+Other - Psychologist,6500,8500,11000,13500,16000
+Other - Physiotherapist,6000,7500,9500,11500,13500
+Other - Occupational Therapist,5800,7200,9200,11000,12800
+Other - Speech Therapist,5500,6800,8500,10200,11800
+Other - Dental Hygienist,5000,6200,7800,9200,10500
+Other - Medical Laboratory Technician,5200,6500,8200,9800,11200
+Other - Radiologic Technician,6000,7500,9500,11500,13200
+Other - Paramedic,5500,6800,8500,10200,11800
+Other - Firefighter,6000,7500,9500,11500,13500
+Other - Police Officer,6500,8000,10000,12000,14000
+AVERAGE - Polish Worker General,5750,7250,8670,10250,12250
