@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_estimated_monthly_salary(industry: str, location: str) -> Decimal:
+async def get_estimated_monthly_salary(industry: str, location: str) -> Decimal:
     """
     Estimates the monthly gross salary in PLN using an LLM and the instructor module,
     for a junior position based on industry and location.
@@ -20,7 +20,7 @@ def get_estimated_monthly_salary(industry: str, location: str) -> Decimal:
              (e.g., '9000.00', '7773.00')
     """
 
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         response_model=Salary,
         messages=[
             {

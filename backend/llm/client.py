@@ -13,14 +13,14 @@ class ChatAdapter:
         def __init__(self, agent: Agent):
             self.agent = agent
 
-        def create(self, response_model, messages):
+        async def create(self, response_model, messages):
             system_prompt = ""
             for m in messages:
                 if m["role"] == "system":
                     system_prompt += m["content"] + "\n"
             user_prompt = next((m["content"] for m in messages if m["role"] == "user"), "")
 
-            result = self.agent.run_sync(
+            result = await self.agent.run(
                 f"{system_prompt}\nUser: {user_prompt}",
                 output_type=response_model,
             )

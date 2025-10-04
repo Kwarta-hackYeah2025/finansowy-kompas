@@ -4,7 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def classify_job(industry: str) -> str:
+async def classify_job(industry: str) -> str:
     """
     Classifies the job title based on the user-provided description of the industry (which can a job title, name of the
     industry, etc. in Polish or in English). Options for the classification are provided in the regression_dict.py 
@@ -18,7 +18,7 @@ def classify_job(industry: str) -> str:
         one of the regression_dict.py dictionary keys.
     """
 
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         response_model=JobEnum,
         messages=[
             {
