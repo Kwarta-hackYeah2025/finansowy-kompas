@@ -1,0 +1,103 @@
+\ProvidesPackage{customcolortheme}[Presentation]
+
+% Required packages
+\RequirePackage{xcolor}
+
+% ============================================
+% DESIGN TOKENS: Color Palette
+% ============================================
+\definecolor{primary}{RGB}{0, 102, 204}
+\definecolor{primaryDark}{RGB}{0, 71, 143}
+\definecolor{primaryLight}{RGB}{102, 178, 255}
+
+\definecolor{secondary}{RGB}{255, 87, 34}
+\definecolor{secondaryDark}{RGB}{191, 54, 12}
+\definecolor{secondaryLight}{RGB}{255, 158, 128}
+
+\definecolor{success}{RGB}{76, 175, 80}
+\definecolor{warning}{RGB}{255, 193, 7}
+\definecolor{error}{RGB}{244, 67, 54}
+\definecolor{info}{RGB}{33, 150, 243}
+
+\definecolor{textPrimary}{RGB}{33, 33, 33}
+\definecolor{textSecondary}{RGB}{117, 117, 117}
+\definecolor{textDisabled}{RGB}{189, 189, 189}
+
+\definecolor{bg}{RGB}{255, 255, 255}
+\definecolor{bgAlt}{RGB}{245, 245, 245}
+\definecolor{surface}{RGB}{255, 255, 255}
+
+% ============================================
+% BEAMER COLOR MAPPINGS
+% ============================================
+
+% Structure
+\setbeamercolor{structure}{fg=primary}
+
+% Frame title
+\setbeamercolor{frametitle}{fg=textPrimary, bg=bgAlt}
+\setbeamercolor{framesubtitle}{fg=textSecondary}
+
+% Title page
+\setbeamercolor{title}{fg=primary}
+\setbeamercolor{subtitle}{fg=textSecondary}
+\setbeamercolor{author}{fg=textPrimary}
+\setbeamercolor{date}{fg=textSecondary}
+\setbeamercolor{institute}{fg=textSecondary}
+
+% Table of contents
+\setbeamercolor{section in toc}{fg=primary}
+\setbeamercolor{subsection in toc}{fg=textSecondary}
+
+% Items
+\setbeamercolor{item}{fg=primary}
+\setbeamercolor{subitem}{fg=primaryLight}
+\setbeamercolor{subsubitem}{fg=textSecondary}
+
+% Blocks
+\setbeamercolor{block title}{fg=white, bg=primary}
+\setbeamercolor{block body}{fg=textPrimary, bg=bgAlt}
+
+\setbeamercolor{block title alerted}{fg=white, bg=error}
+\setbeamercolor{block body alerted}{fg=textPrimary, bg=bgAlt}
+
+\setbeamercolor{block title example}{fg=white, bg=success}
+\setbeamercolor{block body example}{fg=textPrimary, bg=bgAlt}
+
+% Navigation
+\setbeamercolor{navigation symbols}{fg=textDisabled}
+\setbeamercolor{navigation symbols dimmed}{fg=textDisabled}
+
+% Footer
+\setbeamercolor{footline}{fg=textSecondary, bg=bgAlt}
+\setbeamercolor{page number in head/foot}{fg=textSecondary}
+
+% Sidebar
+\setbeamercolor{sidebar}{bg=bgAlt}
+\setbeamercolor{sidebar left}{bg=bgAlt}
+\setbeamercolor{sidebar right}{bg=bgAlt}
+
+% Palette
+\setbeamercolor{palette primary}{fg=white, bg=primary}
+\setbeamercolor{palette secondary}{fg=white, bg=primaryDark}
+\setbeamercolor{palette tertiary}{fg=white, bg=secondary}
+\setbeamercolor{palette quaternary}{fg=white, bg=secondaryDark}
+
+% Bibliography
+\setbeamercolor{bibliography entry author}{fg=primary}
+\setbeamercolor{bibliography entry title}{fg=textPrimary}
+\setbeamercolor{bibliography entry location}{fg=textSecondary}
+\setbeamercolor{bibliography entry note}{fg=textSecondary}
+
+% Caption
+\setbeamercolor{caption}{fg=textSecondary}
+\setbeamercolor{caption name}{fg=primary}
+
+% ============================================
+% HELPER COMMANDS
+% ============================================
+\newcommand{\highlight}[1]{{\color{secondary}#1}}
+\newcommand{\muted}[1]{{\color{textSecondary}#1}}
+\newcommand{\brand}[1]{{\color{primary}#1}}
+
+\endinput

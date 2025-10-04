@@ -1,0 +1,14 @@
+\frametitle{Code Listings}
+
+\begin{lstlisting}[language=Python,
+                   basicstyle=\ttfamily\small,
+                   keywordstyle=\color{primary},
+                   commentstyle=\color{textSecondary},
+                   stringstyle=\color{secondary}]
+def hello_world():
+    """Greet the world"""
+    print("Hello, World!")
+    return True
+\end{lstlisting}
+
+Code highlighting uses our color scheme!
