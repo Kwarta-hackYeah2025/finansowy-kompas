@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     gemini_api_key: str
 
     environment: EnvironmentEnum = EnvironmentEnum.DEVELOPMENT
-    debug: bool = False
+    debug: bool = True
 
     title: str = "Finance Compass Api"
     version: str = "1.0.0"

@@ -26,4 +26,5 @@ async def calculate_salary(industry: str, location: str, experience: int):
     multi = experience_multiplier(experience, float(alpha), float(beta))
     base_salary = await get_estimated_monthly_salary(industry, location)
     logger.info(f'calculating the salary based on based salary: {base_salary} and experience multiplier: {multi} for experience: {experience} years.')
-    return round(Decimal(float(base_salary) * multi), 2)
+    calculated_salary = round(Decimal(float(base_salary) * multi), 2)
+    return calculated_salary, alpha, beta
