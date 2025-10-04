@@ -1,4 +1,4 @@
-from utils import use_cwd
+from backend.utils import use_cwd
 
 
 def create_dict_from_csv(file_name):

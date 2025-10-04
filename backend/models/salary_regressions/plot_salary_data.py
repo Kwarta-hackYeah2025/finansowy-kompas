@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from utils import use_cwd
-from models.salary_regressions.calculate_regression import calculate_regression
-from models.salary_regressions.experience_multiplier_function import (
+from backend.utils import use_cwd
+from backend.models.salary_regressions.calculate_regression import calculate_regression
+from backend.models.salary_regressions.experience_multiplier_function import (
     experience_multiplier_function,
 )
 
