@@ -11,9 +11,14 @@ export const retiringSchema = z.object({
   stopaZwrotu: z.coerce.number().min(-50, "Nierealistycznie niska").max(50, "Nierealistycznie wysoka"),
   wiekEmerytura: z.coerce.number().int().min(40, "Minimum 40 lat").max(85, "Maksymalnie 85 lat"),
   lataDoswiadczenia: z.coerce.number().min(0, "Wartość nie może być ujemna"),
+  sex: z.enum(["male", "female", "unknown"]),
+  career_start: z.coerce.number().int().min(10, "Podaj realistyczny wiek startu kariery").max(80, "Maksymalnie 80 lat"),
 }).refine((data) => data.wiekEmerytura > data.wiek, {
   message: "Wiek emerytalny musi być większy niż obecny wiek",
   path: ["wiekEmerytura"],
+}).refine((data) => data.career_start <= data.wiek, {
+  message: "Wiek startu kariery nie może być większy niż Twój wiek",
+  path: ["career_start"],
 })
 
 export type RetiringFormValues = z.infer<typeof retiringSchema>
@@ -29,4 +34,6 @@ export const defaultRetiringValues: RetiringFormValues = {
   stopaZwrotu: 6,
   wiekEmerytura: 65,
   lataDoswiadczenia: 5,
+  sex: "unknown",
+  career_start: 20,
 }

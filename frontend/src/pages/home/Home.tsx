@@ -7,7 +7,7 @@ import {useNavigate} from "react-router";
 const Home = () => {
 	const navigate = useNavigate();
 	const btnStyles =
-		"px-20 text-2xl h-16 ring-1 ring-white/30 cursor-pointer bg-gradient-to-br from-[#00993f] to-[#007834FF] hover:to-[#ffb34f] transition-colors duration-300";
+		"px-20 text-2xl h-16 ring-1 ring-white/30 rounded-sm cursor-pointer bg-gradient-to-br from-[#00993f] to-[#007834FF] hover:to-[#ffb34f] transition-colors duration-300";
 
 	// warianty jako zwykły obiekt (bez wymuszenia typu Variants)
 	const slideUp = {
@@ -65,7 +65,7 @@ const Home = () => {
 					</div>
 
 					{/* Tekst główny */}
-					<div className="backdrop-blur-sm bg-black/20 rounded-xl px-8 pb-8 ring-1 ring-white/30 z-20 w-full">
+					<div className="backdrop-blur-sm bg-black/35 rounded-md px-8 pb-8 ring-1 ring-white/30 z-20 w-full">
 						<span
 							className="text-6xl whitespace-pre-wrap font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-300 via-stone-300 to-amber-300 transition-colors duration-700 hover:from-sky-300 hover:via-emerald-300 hover:to-lime-300">
 							<span className="text-2xl">Witaj w{'\n'}</span> Finansowym{'\n'} Kompasie!
