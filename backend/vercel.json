@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "framework": null,
+  "functions": {
+    "api/**/*.py": {
+      "runtime": "python3.11",
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "installCommand": "",
+  "buildCommand": "python -m pip install --upgrade pip pipx && pipx install poetry && poetry export -f requirements.txt --output requirements.txt --without-hashes && python -m pip install --no-compile --no-cache-dir --target ./api/routes/_vendor --upgrade -r requirements.txt"
+}
