@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import use_cwd
+from backend.utils import use_cwd
 import logging
-import utils.logging_config  # noqa: F401  # side-effect import to configure logging
+import backend.utils.logging_config  # noqa: F401  # side-effect import to configure logging
 
 logger = logging.getLogger(__name__)
 

@@ -1,13 +1,42 @@
-import instructor  # type: ignore
-from config.settings import settings
+from typing import Any, Dict, List, Type
 
-# OpenAI
-# client = instructor.from_provider("openai/gpt-4", api_key=settings.openai_api_key)
-# Anthropic
-# client = instructor.from_provider("anthropic/claude-3", api_key=settings.anthropic_api_key)
-# Google
-client = instructor.from_provider("google/gemini-2.5-flash-lite", api_key=settings.gemini_api_key)
-# Ollama (local)
-# client = instructor.from_provider("ollama/llama3", api_key=settings.ollama_api_key)
-# DeepSeek
-# client = instructor.from_provider("deepseek/deepseek-chat", api_key=settings.deepseek_api_key)
+from pydantic_ai import Agent
+from pydantic_ai.models.google import GoogleModel
+from pydantic_ai.providers.google import GoogleProvider
+
+from backend.config.settings import settings
+
+
+class ChatAdapter:
+    def __init__(self, agent: Agent):
+        self.agent = agent
+
+    class _Completions:
+        def __init__(self, agent: Agent):
+            self.agent = agent
+
+        async def create(self, response_model: Type[Any], messages: List[Dict[str, str]]) -> Any:
+            system_prompt_parts = [m["content"] for m in messages if m.get("role") == "system"]
+            system_prompt = "\n".join(system_prompt_parts)
+            user_prompt = next((m["content"] for m in messages if m.get("role") == "user"), "")
+
+            result = await self.agent.run(
+                f"{system_prompt}\nUser: {user_prompt}",
+                output_type=response_model,
+            )
+            return result.output
+
+    @property
+    def chat(self):
+        class _Chat:
+            def __init__(self, agent: Agent):
+                self.completions = ChatAdapter._Completions(agent)
+
+        return _Chat(self.agent)
+
+
+provider = GoogleProvider(api_key=settings.gemini_api_key)
+model = GoogleModel("gemini-2.5-flash-lite", provider=provider)
+agent = Agent(model)
+
+client = ChatAdapter(agent=agent)

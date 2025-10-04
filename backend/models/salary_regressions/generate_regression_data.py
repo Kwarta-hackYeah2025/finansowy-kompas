@@ -1,8 +1,8 @@
 import pandas as pd
 from pandas import notnull
 
-from utils import use_cwd
-from models.salary_regressions.calculate_regression import calculate_regression
+from backend.utils import use_cwd
+from backend.models.salary_regressions.calculate_regression import calculate_regression
 import logging
 
 logger = logging.getLogger(__name__)
