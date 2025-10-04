@@ -2,7 +2,7 @@ import logging
 import os
 from enum import Enum
 
-import backend.utils.logging_config  # noqa: F401  # side-effect import to configure logging
+import utils.logging_config  # noqa: F401  # side-effect import to configure logging
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
