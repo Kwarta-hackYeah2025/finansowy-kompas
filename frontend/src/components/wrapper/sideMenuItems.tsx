@@ -2,6 +2,7 @@ import AppsIcon from '@mui/icons-material/Apps';
 import ContactMailOutlinedIcon from '@mui/icons-material/ContactMailOutlined';
 import LiveHelpOutlinedIcon from '@mui/icons-material/LiveHelpOutlined';
 import ViewStreamOutlinedIcon from '@mui/icons-material/ViewStreamOutlined';
+import ElderlyOutlinedIcon from '@mui/icons-material/ElderlyOutlined';
 import { type ReactNode } from 'react';
 
 /**
@@ -21,6 +22,11 @@ export const sideMenuItems: SideMenuItemType[] = [
 		path: '/inflacja',
 		label: 'Inflacja',
 		icon: <AppsIcon />,
+	},
+	{
+		path: '/emerytura',
+		label: 'Emerytura',
+		icon: <ElderlyOutlinedIcon />,
 	},
 	{
 		path: '/ppk',

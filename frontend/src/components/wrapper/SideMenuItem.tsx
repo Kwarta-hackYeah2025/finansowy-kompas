@@ -26,12 +26,8 @@ export function SideMenuItem({
 				to={path}
 				data-testid={testId}
 				title={collapsed ? label : undefined}
-				className={({isActive}) =>
-					`side-menu-item flex items-center p-4 bg-stone-50 px-5 ${
-						isActive
-							? 'text-hover bg-menu-hover'
-							: 'text-foreground hover:text-hover hover:bg-menu-hover'
-					}`
+				className={() =>
+					`side-menu-item flex items-center p-4 bg-stone-50 px-5`
 				}
 			>
 				{icon && (
