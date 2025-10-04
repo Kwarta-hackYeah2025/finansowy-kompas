@@ -1,5 +1,5 @@
-from llm.client import client
-from llm.classify_job.JobEnum import JobEnum
+from backend.llm.client import client
+from backend.llm.classify_job.JobEnum import JobEnum
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,22 +24,22 @@ async def classify_job(industry: str) -> str:
             {
                 "role": "system",
                 "content": """
-                Classify the job title based on the user-provided description of the industry
-                (which can a job title, name of the industry, etc. in Polish or in English).
-                Respond ONLY with one of the predefined categories from the regression dictionary.
-                Return ONLY the category string, with no additional words, labels, or punctuation.
-                
-                Pick the category that best matches the job description or at least the pay progression of the job.
-                
-                If none of the predefined categories matches, respond with the category 'AVERAGE - Polish Worker General'.
-                    Examples: [
-                        "programmer" -> "IT - Software Developer Frontend",
-                        "lekarz" -> "Healthcare - Doctor General",
-                        "architekt" -> "Construction - Architect",
-                        "teacher" -> "Education - Primary Teacher"
-                    ]
-                    Example INVALID outputs: ["category: IT specialist", "Architekt", "Branża budowlana"]
-                """,
+                    Classify the job title based on the user-provided description of the industry
+                    (which can a job title, name of the industry, etc. in Polish or in English).
+                    Respond ONLY with one of the predefined categories from the regression dictionary.
+                    Return ONLY the category string, with no additional words, labels, or punctuation.
+                    
+                    Pick the category that best matches the job description or at least the pay progression of the job.
+                    
+                    If none of the predefined categories matches, respond with the category 'AVERAGE - Polish Worker General'.
+                        Examples: [
+                            "programmer" -> "IT - Software Developer Frontend",
+                            "lekarz" -> "Healthcare - Doctor General",
+                            "architekt" -> "Construction - Architect",
+                            "teacher" -> "Education - Primary Teacher"
+                        ]
+                        Example INVALID outputs: ["category: IT specialist", "Architekt", "Branża budowlana"]
+                    """,
             },
             {"role": "user", "content": industry},
         ],

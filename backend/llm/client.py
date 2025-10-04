@@ -1,8 +1,10 @@
+from typing import Any, Dict, List, Type
+
 from pydantic_ai import Agent
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.providers.google import GoogleProvider
 
-from config.settings import settings
+from backend.config.settings import settings
 
 
 class ChatAdapter:
@@ -13,12 +15,10 @@ class ChatAdapter:
         def __init__(self, agent: Agent):
             self.agent = agent
 
-        async def create(self, response_model, messages):
-            system_prompt = ""
-            for m in messages:
-                if m["role"] == "system":
-                    system_prompt += m["content"] + "\n"
-            user_prompt = next((m["content"] for m in messages if m["role"] == "user"), "")
+        async def create(self, response_model: Type[Any], messages: List[Dict[str, str]]) -> Any:
+            system_prompt_parts = [m["content"] for m in messages if m.get("role") == "system"]
+            system_prompt = "\n".join(system_prompt_parts)
+            user_prompt = next((m["content"] for m in messages if m.get("role") == "user"), "")
 
             result = await self.agent.run(
                 f"{system_prompt}\nUser: {user_prompt}",
@@ -29,7 +29,7 @@ class ChatAdapter:
     @property
     def chat(self):
         class _Chat:
-            def __init__(self, agent):
+            def __init__(self, agent: Agent):
                 self.completions = ChatAdapter._Completions(agent)
 
         return _Chat(self.agent)
