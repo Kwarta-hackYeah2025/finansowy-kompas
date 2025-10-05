@@ -40,6 +40,15 @@ export type PensionPreviewPayload = {
   alpha: number
   beta: number
   retirement_age: number
+  simulation_mode?: boolean
+  simulation_events?: Array<{
+    reason: string
+    start_age: number
+    end_age: number
+    basis_zero: boolean
+    contrib_multiplier: number
+    kind: string
+  }>
 }
 
 // Updated shape to support nominal and real values, while keeping legacy optional fields for compatibility

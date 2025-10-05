@@ -30,6 +30,21 @@ import type {PensionPreviewResponse, SalaryCalculateResponse} from "@/lib/api"
 import {postPensionPreview, postSalaryCalculate} from "@/lib/api"
 import DetailsTiles from "@/pages/retiring/DetailsTiles"
 
+// Define default random events for simulation mode
+const DEFAULT_SIM_EVENTS = [
+	{reason: "bezrobocie", start_age: 20, end_age: 22, basis_zero: true, contrib_multiplier: 0, kind: "przerwa"},
+	{
+		reason: "niepełny etat",
+		start_age: 25,
+		end_age: 30,
+		basis_zero: false,
+		contrib_multiplier: 0.6,
+		kind: "niepełny etat"
+	},
+	{reason: "zagranica bez ZUS", start_age: 35, end_age: 37, basis_zero: true, contrib_multiplier: 0, kind: "zagranica"},
+	{reason: "praca dorywcza", start_age: 40, end_age: 42, basis_zero: false, contrib_multiplier: 0.5, kind: "inne"},
+] as const
+
 function formatYAxisShort(v: number): string {
 	if (!Number.isFinite(v)) return ""
 	const sign = v < 0 ? "-" : ""
@@ -72,6 +87,10 @@ const Analysis = () => {
 	const [backend, setBackend] = React.useState<SalaryCalculateResponse | null>(initialBackend ?? null)
 	const [preview, setPreview] = React.useState<PensionPreviewResponse | null>(state?.preview ?? null)
 	const storedCoeffs = React.useMemo(() => loadRetiringCoefficients(), [])
+
+	// Simulation mode toggle
+	const [simulationEnabled, setSimulationEnabled] = React.useState<boolean>(false)
+	const localSimEvents = React.useMemo(() => DEFAULT_SIM_EVENTS.map(e => ({...e})), [])
 
 	const back = () => navigate("/emerytura")
 
@@ -178,13 +197,9 @@ const Analysis = () => {
 
 	// Compute shaded bands for simulation events (map ages to years on X axis)
 	const eventBands = React.useMemo(() => {
-		const evs = preview?.simulation_events || []
+		const evs = simulationEnabled ? localSimEvents : (preview?.simulation_events || [])
 		if (!Array.isArray(evs) || !evs.length || !points.length) return [] as Array<{
-			from: number;
-			to: number;
-			type: 'zero' | 'partial';
-			label: string;
-			multiplier: number
+			from: number; to: number; type: 'zero' | 'partial'; label: string; multiplier: number
 		}>
 		const firstYear = Number(points[0]?.rok)
 		const minYear = Number(points[0]?.rok)
@@ -197,8 +212,14 @@ const Analysis = () => {
 				const from = Math.max(minYear, Math.min(x1, x2))
 				const to = Math.min(maxYear, Math.max(x1, x2))
 				if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return null
-				const type: 'zero' | 'partial' = (e.basis_zero || e.contrib_multiplier === 0) ? 'zero' : 'partial'
-				return {from, to, type, label: e.reason || e.kind || '', multiplier: Number(e.contrib_multiplier ?? 1)}
+				const type: 'zero' | 'partial' = (e.basis_zero || (e as any).contrib_multiplier === 0) ? 'zero' : 'partial'
+				return {
+					from,
+					to,
+					type,
+					label: (e as any).reason || (e as any).kind || '',
+					multiplier: Number((e as any).contrib_multiplier ?? 1)
+				}
 			})
 			.filter(Boolean) as Array<{
 			from: number;
@@ -207,7 +228,7 @@ const Analysis = () => {
 			label: string;
 			multiplier: number
 		}>
-	}, [preview, points, current.wiek])
+	}, [preview, points, current.wiek, simulationEnabled, localSimEvents])
 
 	const bandColors: Record<'zero' | 'partial', string> = {
 		zero: 'rgba(239, 68, 68, 0.18)', // red-500 @ 18%
@@ -293,7 +314,7 @@ const Analysis = () => {
 
 	// Edit form
 	const editForm = useForm<RetiringFormValues>({
-		resolver: zodResolver(retiringSchema),
+		resolver: zodResolver<RetiringFormValues>(retiringSchema),
 		defaultValues: current,
 		mode: "onBlur",
 	})
@@ -360,7 +381,7 @@ const Analysis = () => {
 			const beta = backend?.beta ?? storedCoeffs?.beta
 			if (!Number.isFinite(alpha) || !Number.isFinite(beta)) return
 			try {
-				const res = await postPensionPreview({
+				const payload = {
 					current_age: Number(current.wiek),
 					years_of_experience: Number(backend.experience_years ?? Math.max(0, Number(current.wiek) - Number(current.career_start))),
 					current_monthly_salary: Number(backend.salary ?? current.pensjaNetto),
@@ -368,7 +389,10 @@ const Analysis = () => {
 					alpha: Number(alpha),
 					beta: Number(beta),
 					retirement_age: Number(current.wiekEmerytura),
-				})
+					simulation_mode: simulationEnabled || undefined,
+					simulation_events: simulationEnabled ? localSimEvents as any : undefined,
+				}
+				const res = await postPensionPreview(payload)
 				if (!cancelled) setPreview(res)
 			} catch (err: unknown) {
 				if (!cancelled) {
@@ -388,7 +412,7 @@ const Analysis = () => {
 		return () => {
 			cancelled = true
 		}
-	}, [backend, current.wiek, current.wiekEmerytura, current.sex, current.career_start, current.pensjaNetto, storedCoeffs])
+	}, [backend, current.wiek, current.wiekEmerytura, current.sex, current.career_start, current.pensjaNetto, storedCoeffs, simulationEnabled, localSimEvents])
 
 	const onEditSubmit: SubmitHandler<RetiringFormValues> = (values) => {
 		saveRetiringData(values)
@@ -401,6 +425,38 @@ const Analysis = () => {
 		setCurrent(defaultRetiringValues)
 		editForm.reset(defaultRetiringValues)
 		toast.info("Dane wyczyszczone")
+	}
+
+	// Helper to render events list panel
+	const EventsPanel = () => {
+		if (!simulationEnabled) return null
+		return (
+			<div className="bg-white rounded-lg border p-3">
+				<div className="flex items-center justify-between mb-2">
+					<div className="text-sm font-medium">Zdarzenia losowe (symulacja)</div>
+					<div className="text-xs text-muted-foreground">uwzględnione w prognozie</div>
+				</div>
+				<div className="flex flex-wrap gap-2">
+					{localSimEvents.map((e, idx) => {
+						const zero = !!e.basis_zero || Number(e.contrib_multiplier) === 0
+						const chipColor = zero ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+						return (
+							<div key={`ev-${idx}`}
+									 className={`rounded-full border ${chipColor} px-3 py-1 text-xs flex items-center gap-2`}>
+								<span className="font-medium">{e.reason}</span>
+								<span className="text-muted-foreground">{e.start_age}–{e.end_age} lat</span>
+								<span className="inline-flex items-center gap-1">
+									<span className="h-1.5 w-1.5 rounded-full"
+												style={{backgroundColor: zero ? 'rgb(239 68 68)' : 'rgb(234 179 8)'}}/>
+									{zero ? '0%' : `${Math.round(Number(e.contrib_multiplier) * 100)}%`}
+								</span>
+								<span className="rounded bg-black/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{e.kind}</span>
+							</div>
+						)
+					})}
+				</div>
+			</div>
+		)
 	}
 
 	return (
@@ -419,151 +475,183 @@ const Analysis = () => {
 					</div>
 				</CardHeader>
 				<CardContent>
-          <div className="flex flex-col gap-6">
-            {/* Top KPIs: Occupation, Experience, Pension and Final Salary (Nominal vs Real) */}
-            <div className="bg-white rounded-lg border p-4">
-              <div className="flex items-start justify-between gap-4 mb-3">
-                <div>
-                  <div className="text-xs text-muted-foreground">Zawód</div>
-                  <div className="text-xl font-semibold leading-tight">{current.stanowisko || '-'}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-muted-foreground">Doświadczenie (mediana)</div>
-                  <div className="text-xl font-semibold leading-tight">{backend?.experience_years ?? '-'} {backend?.experience_years != null ? 'lat' : ''}</div>
-                </div>
-              </div>
+					<div className="flex flex-col gap-6">
+						{/* Top KPIs: Occupation, Experience, Pension and Final Salary (Nominal vs Real) */}
+						<div className="bg-white rounded-lg border p-4">
+							<div className="flex items-start justify-between gap-4 mb-3">
+								<div>
+									<div className="text-xs text-muted-foreground">Zawód</div>
+									<div className="text-xl font-semibold leading-tight">{current.stanowisko || '-'}</div>
+								</div>
+								<div className="text-right">
+									<div className="text-xs text-muted-foreground">Doświadczenie (mediana)</div>
+									<div
+										className="text-xl font-semibold leading-tight">{backend?.experience_years ?? '-'} {backend?.experience_years != null ? 'lat' : ''}</div>
+								</div>
+							</div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {/* Pension nominal */}
-                <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">Emerytura miesięczna</div>
-                  <div className="text-2xl font-semibold mt-0.5">{formatPLN(preview?.monthly_pension_nominal ?? preview?.monthly_pension)}</div>
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">nominalnie</span>
-                    {typeof (preview?.replacement_rate_percent_nominal ?? preview?.replacement_rate_percent) === 'number' && (
-                      <span className="text-[11px] text-muted-foreground">RR: {(preview?.replacement_rate_percent_nominal ?? preview?.replacement_rate_percent)?.toFixed(1)}%</span>
-                    )}
-                  </div>
-                </div>
-                {/* Pension real */}
-                <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">Emerytura miesięczna</div>
-                  <div className="text-2xl font-semibold mt-0.5">{formatPLN(preview?.monthly_pension_real)}</div>
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">realnie</span>
-                    {typeof preview?.replacement_rate_percent_real === 'number' && (
-                      <span className="text-[11px] text-muted-foreground">RR: {preview?.replacement_rate_percent_real?.toFixed(1)}%</span>
-                    )}
-                  </div>
-                </div>
-                {/* Final salary nominal */}
-                <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">Końcowa pensja</div>
-                  <div className="text-2xl font-semibold mt-0.5">{formatPLN(preview?.final_monthly_salary_nominal)}</div>
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">nominalnie</span>
-                    <span className="text-[11px] text-muted-foreground">W wieku: {preview?.retirement_age ?? '-'} lat</span>
-                  </div>
-                </div>
-                {/* Final salary real */}
-                <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">Końcowa pensja</div>
-                  <div className="text-2xl font-semibold mt-0.5">{formatPLN(preview?.final_monthly_salary_real)}</div>
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">realnie</span>
-                    <span className="text-[11px] text-muted-foreground">Za: {preview?.years_to_retirement ?? '-'} lat</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+								{/* Pension nominal */}
+								<div className="rounded-md border p-3">
+									<div className="text-xs text-muted-foreground">Emerytura miesięczna</div>
+									<div
+										className="text-2xl font-semibold mt-0.5">{formatPLN(Number(preview?.monthly_pension_nominal ?? preview?.monthly_pension ?? 0))}</div>
+									<div className="flex items-center justify-between mt-1">
+										<span
+											className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">nominalnie</span>
+										{typeof (preview?.replacement_rate_percent_nominal ?? preview?.replacement_rate_percent) === 'number' && (
+											<span
+												className="text-[11px] text-muted-foreground">RR: {(preview?.replacement_rate_percent_nominal ?? preview?.replacement_rate_percent)?.toFixed(1)}%</span>
+										)}
+									</div>
+								</div>
+								{/* Pension real */}
+								<div className="rounded-md border p-3">
+									<div className="text-xs text-muted-foreground">Emerytura miesięczna</div>
+									<div
+										className="text-2xl font-semibold mt-0.5">{formatPLN(Number(preview?.monthly_pension_real ?? 0))}</div>
+									<div className="flex items-center justify-between mt-1">
+										<span
+											className="text-[11px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">realnie</span>
+										{typeof preview?.replacement_rate_percent_real === 'number' && (
+											<span
+												className="text-[11px] text-muted-foreground">RR: {preview?.replacement_rate_percent_real?.toFixed(1)}%</span>
+										)}
+									</div>
+								</div>
+								{/* Final salary nominal */}
+								<div className="rounded-md border p-3">
+									<div className="text-xs text-muted-foreground">Końcowa pensja</div>
+									<div
+										className="text-2xl font-semibold mt-0.5">{formatPLN(Number(preview?.final_monthly_salary_nominal ?? 0))}</div>
+									<div className="flex items-center justify-between mt-1">
+										<span
+											className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">nominalnie</span>
+										<span
+											className="text-[11px] text-muted-foreground">W wieku: {preview?.retirement_age ?? '-'} lat</span>
+									</div>
+								</div>
+								{/* Final salary real */}
+								<div className="rounded-md border p-3">
+									<div className="text-xs text-muted-foreground">Końcowa pensja</div>
+									<div
+										className="text-2xl font-semibold mt-0.5">{formatPLN(Number(preview?.final_monthly_salary_real ?? 0))}</div>
+									<div className="flex items-center justify-between mt-1">
+										<span
+											className="text-[11px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">realnie</span>
+										<span
+											className="text-[11px] text-muted-foreground">Za: {preview?.years_to_retirement ?? '-'} lat</span>
+									</div>
+								</div>
+							</div>
+						</div>
 
-            {/* Chart */}
-            <div className="flex flex-col gap-6 bg-white rounded-lg border p-4">
-              <ChartContainer config={chartConfig} className="w-full aspect-[16/10]">
-                <AreaChart data={points5} margin={{ left: 16, right: 44, top: 10, bottom: 10 }}>
-                  <defs>
-                    <linearGradient id={gradAnnual} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-annual_salary)" stopOpacity={0.35}/>
-                      <stop offset="95%" stopColor="var(--color-annual_salary)" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id={gradiPillar} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-i_pillar)" stopOpacity={0.35}/>
-                      <stop offset="95%" stopColor="var(--color-i_pillar)" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id={gradiiPillar} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-ii_pillar)" stopOpacity={0.35}/>
-                      <stop offset="95%" stopColor="var(--color-ii_pillar)" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id={gradTotal} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-total)" stopOpacity={0.35}/>
-                      <stop offset="95%" stopColor="var(--color-total)" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3"/>
-                  <XAxis dataKey="rok" tickMargin={8} ticks={xTicks5}/>
-                  <YAxis yAxisId="left" tickMargin={8} tickCount={10}
-									tickFormatter={(v: number) => formatYAxisShort(v)}/>
-                  <YAxis yAxisId="right" orientation="right" tickMargin={8} tickCount={10}
-									tickFormatter={(v: number) => formatYAxisShort(v)} domain={[rightAxisMin, 'auto']}/>
-                  <ChartTooltip content={<CustomTooltip/>}/>
+						{/* Chart */}
+						<div className="flex flex-col gap-4">
+							<div className="flex items-center justify-between bg-white rounded-lg border p-3">
+								<label className="flex items-center gap-2 select-none">
+									<input type="checkbox" className="size-4 rounded border" checked={simulationEnabled}
+												 onChange={(e) => setSimulationEnabled(e.target.checked)}/>
+									<span className="text-sm">Uwzględnij nieprzewidziane zdarzenia losowe</span>
+								</label>
+								<div className="text-xs text-muted-foreground">wpływają na wysokość składek i kapitału</div>
+							</div>
 
-                  {/* Simulation event bands (under series) */}
-                  {eventBands.map((b, idx) => (
-                    <ReferenceArea key={`band-${idx}`} x1={b.from} x2={b.to} strokeOpacity={0}
-														fill={bandColors[b.type]}/>
-                  ))}
+							<EventsPanel/>
 
-                  {/* Salary: nominal (filled) and real (line) on right axis */}
-                  <Area yAxisId="right" type="monotone" dataKey="annual_salary" stroke="var(--color-annual_salary)"
-								fill={`url(#${gradAnnual})`} strokeWidth={2}/>
-                  <Area yAxisId="right" type="monotone" dataKey="annual_salary_real"
-								stroke="var(--color-annual_salary_real)" fill="transparent" strokeWidth={2}
-								strokeDasharray="4 3"/>
+							<div className="flex flex-col gap-6 bg-white rounded-lg border p-4">
+								<ChartContainer config={chartConfig} className="w-full aspect-[16/10]">
+									<AreaChart data={points5} margin={{left: 16, right: 44, top: 10, bottom: 10}}>
+										<defs>
+											<linearGradient id={gradAnnual} x1="0" y1="0" x2="0" y2="1">
+												<stop offset="5%" stopColor="var(--color-annual_salary)" stopOpacity={0.35}/>
+												<stop offset="95%" stopColor="var(--color-annual_salary)" stopOpacity={0}/>
+											</linearGradient>
+											<linearGradient id={gradiPillar} x1="0" y1="0" x2="0" y2="1">
+												<stop offset="5%" stopColor="var(--color-i_pillar)" stopOpacity={0.35}/>
+												<stop offset="95%" stopColor="var(--color-i_pillar)" stopOpacity={0}/>
+											</linearGradient>
+											<linearGradient id={gradiiPillar} x1="0" y1="0" x2="0" y2="1">
+												<stop offset="5%" stopColor="var(--color-ii_pillar)" stopOpacity={0.35}/>
+												<stop offset="95%" stopColor="var(--color-ii_pillar)" stopOpacity={0}/>
+											</linearGradient>
+											<linearGradient id={gradTotal} x1="0" y1="0" x2="0" y2="1">
+												<stop offset="5%" stopColor="var(--color-total)" stopOpacity={0.35}/>
+												<stop offset="95%" stopColor="var(--color-total)" stopOpacity={0}/>
+											</linearGradient>
+										</defs>
+										<CartesianGrid strokeDasharray="3 3"/>
+										<XAxis dataKey="rok" tickMargin={8} ticks={xTicks5}/>
+										<YAxis yAxisId="left" tickMargin={8} tickCount={10}
+													 tickFormatter={(v: number) => formatYAxisShort(v)}/>
+										<YAxis yAxisId="right" orientation="right" tickMargin={8} tickCount={10}
+													 tickFormatter={(v: number) => formatYAxisShort(v)} domain={[rightAxisMin, 'auto']}/>
+										<ChartTooltip content={<CustomTooltip/>}/>
 
-                  {/* Pillars: nominal stacked, real as lines */}
-                  <Area yAxisId="left" type="monotone" dataKey="i_pillar" stackId="nominal"
-								stroke="var(--color-i_pillar)" fill={`url(#${gradiPillar})`} strokeWidth={2}/>
-                  <Area yAxisId="left" type="monotone" dataKey="ii_pillar" stackId="nominal"
-								stroke="var(--color-ii_pillar)" fill={`url(#${gradiiPillar})`} strokeWidth={2}/>
+										{/* Simulation event bands (under series) */}
+										{eventBands.map((b, idx) => (
+											<ReferenceArea key={`band-${idx}`} x1={b.from} x2={b.to} strokeOpacity={0}
+																		 fill={bandColors[b.type]}/>
+										))}
 
-                  <Area yAxisId="left" type="monotone" dataKey="i_pillar_real" stroke="var(--color-i_pillar_real)"
-								fill="transparent" strokeWidth={2} strokeDasharray="4 3"/>
-                  <Area yAxisId="left" type="monotone" dataKey="ii_pillar_real" stroke="var(--color-ii_pillar_real)"
-								fill="transparent" strokeWidth={2} strokeDasharray="4 3"/>
+										{/* Salary: nominal (filled) and real (line) on right axis */}
+										<Area yAxisId="right" type="monotone" dataKey="annual_salary" stroke="var(--color-annual_salary)"
+													fill={`url(#${gradAnnual})`} strokeWidth={2}/>
+										<Area yAxisId="right" type="monotone" dataKey="annual_salary_real"
+													stroke="var(--color-annual_salary_real)" fill="transparent" strokeWidth={2}
+													strokeDasharray="4 3"/>
 
-                  {/* Totals */}
-                  <Area yAxisId="left" type="monotone" dataKey="total" stroke="var(--color-total)"
-								fill={`url(#${gradTotal})`} strokeWidth={2}/>
-                  <Area yAxisId="left" type="monotone" dataKey="total_real" stroke="var(--color-total_real)"
-								fill="transparent" strokeWidth={2} strokeDasharray="4 3"/>
+										{/* Pillars: nominal stacked, real as lines */}
+										<Area yAxisId="left" type="monotone" dataKey="i_pillar" stackId="nominal"
+													stroke="var(--color-i_pillar)" fill={`url(#${gradiPillar})`} strokeWidth={2}/>
+										<Area yAxisId="left" type="monotone" dataKey="ii_pillar" stackId="nominal"
+													stroke="var(--color-ii_pillar)" fill={`url(#${gradiiPillar})`} strokeWidth={2}/>
 
-                  <ChartLegend content={<ChartLegendContent/>}/>
-                </AreaChart>
-              </ChartContainer>
+										<Area yAxisId="left" type="monotone" dataKey="i_pillar_real" stroke="var(--color-i_pillar_real)"
+													fill="transparent" strokeWidth={2} strokeDasharray="4 3"/>
+										<Area yAxisId="left" type="monotone" dataKey="ii_pillar_real" stroke="var(--color-ii_pillar_real)"
+													fill="transparent" strokeWidth={2} strokeDasharray="4 3"/>
 
-              {/* Segment legend */}
-              {eventBands.length > 0 && (
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2"><span className="inline-block w-3 h-3 rounded-[2px]" style={{ backgroundColor: bandColors.zero }} /> przerwa w składkach (0%)</div>
-                  <div className="flex items-center gap-2"><span className="inline-block w-3 h-3 rounded-[2px]" style={{ backgroundColor: bandColors.partial }} /> ograniczone składki (&lt;100%)</div>
-                </div>
-              )}
+										{/* Totals */}
+										<Area yAxisId="left" type="monotone" dataKey="total" stroke="var(--color-total)"
+													fill={`url(#${gradTotal})`} strokeWidth={2}/>
+										<Area yAxisId="left" type="monotone" dataKey="total_real" stroke="var(--color-total_real)"
+													fill="transparent" strokeWidth={2} strokeDasharray="4 3"/>
 
-              <div className="text-xs text-muted-foreground">
-                Zmiany są zapisywane w tej przeglądarce (localStorage) i odświeżają tabelę i wykres.
-              </div>
-            </div>
+										<ChartLegend content={<ChartLegendContent/>}/>
+									</AreaChart>
+								</ChartContainer>
 
-            {/* Details (condensed) */}
-            <div>
-              <h3 className="text-base font-semibold mb-2">Szczegóły</h3>
-              <DetailsTiles data={current} backend={backend} preview={preview} />
-            </div>
-          </div>
-          <div className="flex justify-end mt-6">
-            <Button onClick={back} variant="outline">Wróć do formularza</Button>
-          </div>
-        </CardContent>
+								{/* Segment legend */}
+								{eventBands.length > 0 && (
+									<div className="flex items-center gap-4 text-xs text-muted-foreground">
+										<div className="flex items-center gap-2"><span className="inline-block w-3 h-3 rounded-[2px]"
+																																	 style={{backgroundColor: bandColors.zero}}/> przerwa
+											w składkach (0%)
+										</div>
+										<div className="flex items-center gap-2"><span className="inline-block w-3 h-3 rounded-[2px]"
+																																	 style={{backgroundColor: bandColors.partial}}/> ograniczone
+											składki (&lt;100%)
+										</div>
+									</div>
+								)}
+
+								<div className="text-xs text-muted-foreground">
+									Zmiany są zapisywane w tej przeglądarce (localStorage) i odświeżają tabelę i wykres.
+								</div>
+							</div>
+
+							{/* Details (condensed) */}
+							<div>
+								<h3 className="text-base font-semibold mb-2">Szczegóły</h3>
+								<DetailsTiles data={current} backend={backend} preview={preview}/>
+							</div>
+						</div>
+						<div className="flex justify-end mt-6">
+							<Button onClick={back} variant="outline">Wróć do formularza</Button>
+						</div>
+					</div>
+				</CardContent>
 			</Card>
 
 			{/* Edit Modal */}

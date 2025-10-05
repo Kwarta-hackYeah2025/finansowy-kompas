@@ -4,7 +4,6 @@ import type { SalaryCalculateResponse, PensionPreviewResponse } from "@/lib/api"
 const sexLabel = (value: any) => {
 	if (value === 'male') return 'Mężczyzna';
 	if (value === 'female') return 'Kobieta';
-	if (value === 'unknown') return 'Nie chcę podawać';
 	return '-';
 }
 
