@@ -12,124 +12,136 @@ from backend.models.pension_models.ZUSContributionRates import ZUSContributionRa
 
 logger = logging.getLogger(__name__)
 
-class PensionModel(BaseModel):
-    """User profile with basic demographic info"""
+ONE = Decimal("1")
 
-    current_age: int = Field(description="Age")
-    current_salary: Decimal = Field(description="The current salary")
-    alpha: float = Field(description="Parameter alpha for experience multiplier model")
-    beta: float = Field(
-        description="Parameter beta for the experience multiplier model"
-    )
-    years_of_experience: int = Field(description="Years of experience")
-    is_male: bool = Field(default=True, description="Gender (affects retirement age)")
+class PensionModel(BaseModel):
+    """
+    Model spójny z dwiema walutami:
+    - NOMINALNA: „ile złotych” w danym roku (z inflacją).
+    - REALNA: w stałej sile nabywczej dzisiejszych pieniędzy (po odjęciu inflacji).
+    """
+
+    # ------------------------------
+    # Dane wejściowe
+    # ------------------------------
+    current_age: int = Field(description="Wiek (lata)")
+    current_salary: Decimal = Field(description="Bieżące wynagrodzenie miesięczne (nominalne)")
+    alpha: float = Field(description="Parametr alpha dla krzywej doświadczenia")
+    beta: float = Field(description="Parametr beta dla krzywej doświadczenia")
+    years_of_experience: int = Field(description="Lata doświadczenia zawodowego")
+    is_male: bool = Field(default=True, description="Płeć (wpływa na wiek emerytalny)")
     current_year: int = Field(default_factory=lambda: date.today().year)
+
     macroeconomic_factors: MacroeconomicFactors = Field(
-        default=MacroeconomicFactors(), description="Macroeconomic factors"
+        default=MacroeconomicFactors(), description="Czynniki makro (z historią)"
     )
     zus_contribution_rate: ZUSContributionRates = Field(
-        default=ZUSContributionRates(), description="ZUS contribution rates"
+        default=ZUSContributionRates(), description="Stawki składek ZUS (I/II filar)"
     )
+
     retirement_age: Optional[int] = Field(
-        default=None, description="Age at which retirement is planned"
+        default=None, description="Planowany wiek przejścia na emeryturę"
     )
+
     accumulated_i_pillar_capital: Decimal = Field(
-        default=Decimal("0"), description="Already accumulated capital in I filar"
+        default=Decimal("0"), description="Zgromadzony kapitał w I filarze"
     )
     accumulated_ii_pillar_capital: Decimal = Field(
-        default=Decimal("0"),
-        description="Already accumulated capital in II filar (subkonto)",
+        default=Decimal("0"), description="Zgromadzony kapitał w II filarze (subkonto)"
     )
 
-    def salary_in_the_past_or_future(
-        self, current_salary: Decimal, year_delta: int
-    ) -> Decimal:
+    # ------------------------------
+    # Krzywa doświadczenia
+    # ------------------------------
+    def _experience_multiplier_ratio(self, year_delta: int) -> Decimal:
+        exp_then = max(0, self.years_of_experience + year_delta)
+        m_then = experience_multiplier(exp=exp_then, alpha=self.alpha, beta=self.beta)
+        m_now  = experience_multiplier(exp=self.years_of_experience, alpha=self.alpha, beta=self.beta)
+        return Decimal(str(m_then / m_now))
+
+    def salary_in_the_past_or_future_real(self, current_salary: Decimal, year_delta: int) -> Decimal:
         """
-        Calculates the REAL (constant-price) salary year_delta years from now
-        (negative for past, positive for future) using only the experience curve.
-
-        The experience multiplier is a saturation curve, NOT pure exponential.
-        Therefore we must use the ratio method: S_then = S_now * (m(exp_then) / m(exp_now))
-
-        Args:
-            current_salary: Current gross salary (monthly or annual — consistent usage)
-            year_delta: Years from current year (can be negative)
-
-        Returns:
-            Estimated gross salary for that year in real terms (without inflation)
+        REAL: tylko doświadczenie (stała siła nabywcza), bez makro.
         """
-        experience_then = max(0, self.years_of_experience + year_delta)
-
-        # Get multiplier at target experience level
-        multiplier_then = experience_multiplier(
-            exp=experience_then,
-            alpha=self.alpha,
-            beta=self.beta,
-        )
-
-        # Get multiplier at current experience level
-        multiplier_now = experience_multiplier(
-            exp=self.years_of_experience,
-            alpha=self.alpha,
-            beta=self.beta,
-        )
-
-        return current_salary * Decimal(str(multiplier_then / multiplier_now))
+        return current_salary * self._experience_multiplier_ratio(year_delta)
 
     # ------------------------------
-    # Nominal wage helpers & salary
+    # Stopy makro (z historii lub defaultów)
     # ------------------------------
+    def _inflation_rate_for_year(self, year: int) -> Decimal:
+        ys = str(year)
+        if ys in self.macroeconomic_factors.historical_data:
+            infl = self.macroeconomic_factors.historical_data[ys][0]
+            return infl
+        return self.macroeconomic_factors.inflation_rate
+
+    def _real_wage_growth_rate_for_year(self, year: int) -> Decimal:
+        ys = str(year)
+        if ys in self.macroeconomic_factors.historical_data:
+            real = self.macroeconomic_factors.historical_data[ys][1]
+            return real
+        return self.macroeconomic_factors.real_wage_growth_rate
+
     def _nominal_wage_growth_rate_for_year(self, year: int) -> Decimal:
-        """
-        Resolve nominal wage growth rate for a given year.
-        Uses historical data if available; otherwise falls back to default
-        nominal_wage_growth_rate from MacroeconomicFactors.
-        """
-        year_str = str(year)
-        if year_str in self.macroeconomic_factors.historical_data:
-            infl, real_growth, *_ = self.macroeconomic_factors.historical_data[year_str]
-            return infl + real_growth
+        ys = str(year)
+        if ys in self.macroeconomic_factors.historical_data:
+            infl, real, *_ = self.macroeconomic_factors.historical_data[ys]
+            return infl + real
         return self.macroeconomic_factors.nominal_wage_growth_rate
 
+    # ------------------------------
+    # Akumulatory wzrostów (nominalny / realny)
+    # ------------------------------
     def _cumulative_nominal_growth(self, from_year: int, to_year: int) -> Decimal:
-        """
-        Compute cumulative nominal wage growth factor between two years.
-        - If to_year > from_year: ∏ (1 + g_y) for y in [from_year, to_year)
-        - If to_year < from_year: ∏ (1 / (1 + g_y)) for y in [to_year, from_year)
-        - If equal: 1
-        """
-        factor = Decimal("1")
+        factor = ONE
         if to_year > from_year:
             for y in range(from_year, to_year):
-                rate = self._nominal_wage_growth_rate_for_year(y)
-                factor *= (Decimal("1") + rate)
+                factor *= (ONE + self._nominal_wage_growth_rate_for_year(y))
         elif to_year < from_year:
             for y in range(to_year, from_year):
-                rate = self._nominal_wage_growth_rate_for_year(y)
-                factor /= (Decimal("1") + rate)
+                factor /= (ONE + self._nominal_wage_growth_rate_for_year(y))
         return factor
 
-    def salary_in_the_past_or_future_nominal(
-        self, current_salary: Decimal, year_delta: int
-    ) -> Decimal:
+    def _cumulative_real_growth(self, from_year: int, to_year: int) -> Decimal:
         """
-        Calculates the NOMINAL salary year_delta years from now by:
-        1) Adjusting for experience curve (real effect)
-        2) Applying cumulative nominal wage growth (inflation + real macro growth)
+        Skumulowany REALNY wzrost płac (bez inflacji) między latami.
         """
-        # Step 1: real, experience-based salary change
-        real_salary = self.salary_in_the_past_or_future(current_salary, year_delta)
+        factor = ONE
+        if to_year > from_year:
+            for y in range(from_year, to_year):
+                factor *= (ONE + self._real_wage_growth_rate_for_year(y))
+        elif to_year < from_year:
+            for y in range(to_year, from_year):
+                factor /= (ONE + self._real_wage_growth_rate_for_year(y))
+        return factor
 
-        # Step 2: apply nominal macro factor from current_year to target year
+    # ------------------------------
+    # Pensje: nominalna i realna (z makro)
+    # ------------------------------
+    def salary_in_the_past_or_future_nominal(self, current_salary: Decimal, year_delta: int) -> Decimal:
+        """
+        NOMINALNA: doświadczenie × skumulowany nominalny wzrost płac.
+        """
+        real_salary = self.salary_in_the_past_or_future_real(current_salary, year_delta)
         target_year = self.current_year + year_delta
         nominal_factor = self._cumulative_nominal_growth(self.current_year, target_year)
+        return real_salary * nominal_factor
 
-        return (real_salary * nominal_factor)
+    def salary_in_the_past_or_future_real_with_macro(self, current_salary: Decimal, year_delta: int) -> Decimal:
+        """
+        REALNA: doświadczenie × skumulowany REALNY wzrost płac.
+        """
+        base = self.salary_in_the_past_or_future_real(current_salary, year_delta)
+        target_year = self.current_year + year_delta
+        real_factor = self._cumulative_real_growth(self.current_year, target_year)
+        return base * real_factor
 
+    # ------------------------------
+    # Pola pochodne
+    # ------------------------------
     @computed_field  # type: ignore
     @property
     def work_start_year(self) -> int:
-        """Assume they started working at (current_age - years_of_experience)"""
         return self.current_year - self.years_of_experience
 
     @computed_field  # type: ignore
@@ -142,258 +154,176 @@ class PensionModel(BaseModel):
     @computed_field  # type: ignore
     @property
     def effective_retirement_age(self) -> int:
-        """Actual retirement age (custom or standard)"""
         config = RetirementAgeConfig()
         return self.retirement_age or config.get_retirement_age(self.is_male)
 
-    def calculate_annual_contribution_i_pillar(self, gross_salary: Decimal) -> Decimal:
-        """
-        Calculate annual I filar contribution
+    # ------------------------------
+    # Składki roczne (z miesięcznego brutto)
+    # ------------------------------
+    def calculate_annual_contribution_i_pillar(self, gross_monthly_salary: Decimal) -> Decimal:
+        return gross_monthly_salary * self.zus_contribution_rate.i_pillar_rate * Decimal("12")
 
-        Args:
-            gross_salary: Annual gross salary
+    def calculate_annual_contribution_ii_pillar(self, gross_monthly_salary: Decimal) -> Decimal:
+        return gross_monthly_salary * self.zus_contribution_rate.ii_pillar_rate * Decimal("12")
 
-        Returns:
-            Annual contribution to I filar
-        """
-        return gross_salary * self.zus_contribution_rate.i_pillar_rate * Decimal('12')
-
-    def calculate_annual_contribution_ii_pillar(self, gross_salary: Decimal) -> Decimal:
-        """
-        Calculate annual II filar (subkonto) contribution
-
-        Args:
-            gross_salary: Annual gross salary
-
-        Returns:
-            Annual contribution to II filar
-        """
-        return gross_salary * self.zus_contribution_rate.ii_pillar_rate * Decimal('12')
-
-    # ========================================================================
-    # VALORIZATION & INDEXATION RATE RETRIEVAL
-    # ========================================================================
-
+    # ------------------------------
+    # Stopy waloryzacji I/II: nominalne i realne
+    # ------------------------------
     def get_i_pillar_valorization_rate(self, year: int) -> Decimal:
-        """
-        Get I filar valorization rate for a specific year
-
-        Args:
-            year: Year for which to get the rate
-
-        Returns:
-            Valorization rate for that year
-        """
-        year_str = str(year)
-        if year_str in self.macroeconomic_factors.historical_data:
-            # historical_data tuple: (inflation, real_wage_growth, i_pillar_index, ii_pillar_index)
-            return self.macroeconomic_factors.historical_data[year_str][2]
-        else:
-            # Use projected/default rate for future years
-            return self.macroeconomic_factors.i_pillar_indexation_rate
+        ys = str(year)
+        if ys in self.macroeconomic_factors.historical_data:
+            return self.macroeconomic_factors.historical_data[ys][2]
+        return self.macroeconomic_factors.i_pillar_indexation_rate
 
     def get_ii_pillar_indexation_rate(self, year: int) -> Decimal:
-        """
-        Get II filar indexation rate for a specific year
+        ys = str(year)
+        if ys in self.macroeconomic_factors.historical_data:
+            return self.macroeconomic_factors.historical_data[ys][3]
+        return self.macroeconomic_factors.ii_pillar_indexation_rate
 
-        Args:
-            year: Year for which to get the rate
+    def get_i_pillar_real_valorization_rate(self, year: int) -> Decimal:
+        r_nom = self.get_i_pillar_valorization_rate(year)
+        pi    = self._inflation_rate_for_year(year)
+        return (ONE + r_nom) / (ONE + pi) - ONE
 
-        Returns:
-            Indexation rate for that year
-        """
-        year_str = str(year)
-        if year_str in self.macroeconomic_factors.historical_data:
-            # historical_data tuple: (inflation, real_wage_growth, i_pillar_index, ii_pillar_index)
-            return self.macroeconomic_factors.historical_data[year_str][3]
-        else:
-            # Use projected/default rate for future years
-            return self.macroeconomic_factors.ii_pillar_indexation_rate
+    def get_ii_pillar_real_indexation_rate(self, year: int) -> Decimal:
+        r_nom = self.get_ii_pillar_indexation_rate(year)
+        pi    = self._inflation_rate_for_year(year)
+        return (ONE + r_nom) / (ONE + pi) - ONE
 
-    # ========================================================================
-    # CAPITAL VALORIZATION & INDEXATION
-    # ========================================================================
+    # ------------------------------
+    # Waloryzacja kapitału: nominal / real
+    # ------------------------------
+    def valorize_i_pillar_capital(self, capital: Decimal, from_year: int, to_year: int) -> Decimal:
+        out = capital
+        for y in range(from_year, to_year):
+            out *= (ONE + self.get_i_pillar_valorization_rate(y))
+        return out
 
-    def valorize_i_pillar_capital(
-        self, capital: Decimal, from_year: int, to_year: int
-    ) -> Decimal:
-        """
-        Apply ZUS I filar valorization to capital from one year to another
+    def index_ii_pillar_capital(self, capital: Decimal, from_year: int, to_year: int) -> Decimal:
+        out = capital
+        for y in range(from_year, to_year):
+            out *= (ONE + self.get_ii_pillar_indexation_rate(y))
+        return out
 
-        Formula: capital × ∏(1 + valorization_rate[year]) for each year
+    def valorize_i_pillar_capital_real(self, capital: Decimal, from_year: int, to_year: int) -> Decimal:
+        out = capital
+        for y in range(from_year, to_year):
+            out *= (ONE + self.get_i_pillar_real_valorization_rate(y))
+        return out
 
-        Args:
-            capital: Initial capital amount
-            from_year: Starting year
-            to_year: Ending year (exclusive)
+    def index_ii_pillar_capital_real(self, capital: Decimal, from_year: int, to_year: int) -> Decimal:
+        out = capital
+        for y in range(from_year, to_year):
+            out *= (ONE + self.get_ii_pillar_real_indexation_rate(y))
+        return out
 
-        Returns:
-            Valorized capital
-        """
-        valorized = capital
-        for year in range(from_year, to_year):
-            rate = self.get_i_pillar_valorization_rate(year)
-            valorized *= Decimal("1") + rate
-        return valorized
-
-    def index_ii_pillar_capital(
-        self, capital: Decimal, from_year: int, to_year: int
-    ) -> Decimal:
-        """
-        Apply II filar indexation to capital from one year to another
-
-        Formula: capital × ∏(1 + indexation_rate[year]) for each year
-
-        Args:
-            capital: Initial capital amount
-            from_year: Starting year
-            to_year: Ending year (exclusive)
-
-        Returns:
-            Indexed capital
-        """
-        indexed = capital
-        for year in range(from_year, to_year):
-            rate = self.get_ii_pillar_indexation_rate(year)
-            indexed *= Decimal("1") + rate
-        return indexed
-
-    # ========================================================================
-    # HISTORICAL RECONSTRUCTION
-    # ========================================================================
-
+    # ------------------------------
+    # Rekonstrukcja i projekcja (NOMINALNIE)
+    # ------------------------------
     def reconstruct_historical_contributions(self) -> tuple[Decimal, Decimal]:
-        """
-        Reconstruct and valorize/index all past contributions from work_start_year
-        to current_year
+        total_i = self.accumulated_i_pillar_capital or Decimal("0")
+        total_ii = self.accumulated_ii_pillar_capital or Decimal("0")
 
-        For each past year:
-        1. Estimate salary based on experience curve
-        2. Calculate contributions
-        3. Valorize/index from that year to present
-        4. Sum all valorized contributions
-
-        Returns:
-            (total_i_pillar_valorized, total_ii_pillar_indexed)
-        """
-        total_i_pillar = Decimal("0")
-        total_ii_pillar = Decimal("0")
-
-        # Loop through each year of work history
         for year in range(self.work_start_year, self.current_year):
-            # Calculate how many years ago this was
             year_delta = year - self.current_year
+            salary_nominal = self.salary_in_the_past_or_future_nominal(self.current_salary, year_delta)
+            i_contrib = self.calculate_annual_contribution_i_pillar(salary_nominal)
+            ii_contrib = self.calculate_annual_contribution_ii_pillar(salary_nominal)
 
-            # Estimate salary for that year
-            salary_then = self.salary_in_the_past_or_future(
-                year_delta=year_delta, current_salary=self.current_salary
-            )
-
-            # Calculate contributions for that year
-            i_contribution = self.calculate_annual_contribution_i_pillar(salary_then)
-            ii_contribution = self.calculate_annual_contribution_ii_pillar(salary_then)
-
-            # Valorize/index from contribution year to current year
-            i_valorized = self.valorize_i_pillar_capital(
-                i_contribution, year, self.current_year
-            )
-            ii_indexed = self.index_ii_pillar_capital(
-                ii_contribution, year, self.current_year
-            )
-
-            # Add to totals
-            total_i_pillar += i_valorized
-            total_ii_pillar += ii_indexed
-
-        return total_i_pillar, total_ii_pillar
-
-    def project_future_accumulation(self) -> tuple[Decimal, Decimal]:
-        """
-        Project future I and II pillar accumulation from the current year until retirement
-
-        For each future year:
-        1. Project salary based on the experience multiplier model
-        2. Calculate contributions
-        3. Valorize/index from contribution year to retirement year
-        4. Sum all future contributions
-
-        Returns:
-            (total_i_pillar_at_retirement, total_ii_pillar_at_retirement)
-        """
-        total_i_pillar = Decimal("0")
-        total_ii_pillar = Decimal("0")
-
-        retirement_year = self.current_year + self.years_to_standard_retirement
-
-        # Loop through each future working year
-        for year in range(self.current_year, retirement_year):
-            # Calculate years from now
-            year_delta = year - self.current_year
-
-            # Project salary for that year
-            salary_future = self.salary_in_the_past_or_future(
-                year_delta=year_delta, current_salary=self.current_salary
-            )
-
-            # Calculate contributions
-            i_contribution = self.calculate_annual_contribution_i_pillar(salary_future)
-            ii_contribution = self.calculate_annual_contribution_ii_pillar(
-                salary_future
-            )
-
-            # Valorize/index from contribution year to retirement
-            i_valorized = self.valorize_i_pillar_capital(
-                i_contribution, year, retirement_year
-            )
-            ii_indexed = self.index_ii_pillar_capital(
-                ii_contribution, year, retirement_year
-            )
-
-            # Add to totals
-            total_i_pillar += i_valorized
-            total_ii_pillar += ii_indexed
-
-        return total_i_pillar, total_ii_pillar
-
-    # ========================================================================
-    # TOTAL CAPITAL CALCULATION
-    # ========================================================================
-
-    def calculate_total_retirement_capital(self) -> tuple[Decimal, Decimal]:
-        """
-        Calculate complete retirement capital at retirement age
-        Combines historical reconstruction + future projection
-
-        NOTE: Currently ignores accumulated_i_pillar_capital and
-        accumulated_ii_pillar_capital fields (assumes reconstruction from scratch)
-
-        Returns:
-            (total_i_pillar, total_ii_pillar) at retirement
-        """
-        # Reconstruct past contributions (valorized to current year)
-        past_i, past_ii = self.reconstruct_historical_contributions()
-
-        # Project future contributions (valorized to retirement year)
-        future_i, future_ii = self.project_future_accumulation()
-
-        # Need to valorize past contributions from current_year to retirement_year
-        retirement_year = self.current_year + self.years_to_standard_retirement
-
-        past_i_at_retirement = self.valorize_i_pillar_capital(
-            past_i, self.current_year, retirement_year
-        )
-        past_ii_at_retirement = self.index_ii_pillar_capital(
-            past_ii, self.current_year, retirement_year
-        )
-
-        total_i = past_i_at_retirement + future_i
-        total_ii = past_ii_at_retirement + future_ii
-
+            total_i += self.valorize_i_pillar_capital(i_contrib, year, self.current_year)
+            total_ii += self.index_ii_pillar_capital(ii_contrib, year, self.current_year)
         return total_i, total_ii
 
-    # ========================================================================
-    # MONTHLY PENSION CALCULATION
-    # ========================================================================
+    def project_future_accumulation(self) -> tuple[Decimal, Decimal]:
+        total_i = Decimal("0")
+        total_ii = Decimal("0")
+        retirement_year = self.current_year + self.years_to_standard_retirement
+
+        for year in range(self.current_year, retirement_year):
+            year_delta = year - self.current_year
+            salary_nominal = self.salary_in_the_past_or_future_nominal(self.current_salary, year_delta)
+            i_contrib = self.calculate_annual_contribution_i_pillar(salary_nominal)
+            ii_contrib = self.calculate_annual_contribution_ii_pillar(salary_nominal)
+
+            total_i += self.valorize_i_pillar_capital(i_contrib, year, retirement_year)
+            total_ii += self.index_ii_pillar_capital(ii_contrib, year, retirement_year)
+        return total_i, total_ii
+
+    # ------------------------------
+    # Rekonstrukcja i projekcja (REALNIE)
+    # ------------------------------
+    def reconstruct_historical_contributions_real(self) -> tuple[Decimal, Decimal]:
+        """
+        Składki od pensji REALNYCH (doświadczenie × real growth), kapitał waloryzowany
+        realnymi stopami (nominalne indexacje oddeflowane inflacją).
+        """
+        total_i = Decimal("0")
+        total_ii = Decimal("0")
+
+        # Dolicz już zgromadzone kapitały – przelicz do realu bieżącego roku
+        if self.accumulated_i_pillar_capital:
+            total_i += self.valorize_i_pillar_capital_real(self.accumulated_i_pillar_capital, self.current_year, self.current_year)
+        if self.accumulated_ii_pillar_capital:
+            total_ii += self.index_ii_pillar_capital_real(self.accumulated_ii_pillar_capital, self.current_year, self.current_year)
+
+        for year in range(self.work_start_year, self.current_year):
+            year_delta = year - self.current_year
+            salary_real = self.salary_in_the_past_or_future_real_with_macro(self.current_salary, year_delta)
+            i_contrib = self.calculate_annual_contribution_i_pillar(salary_real)
+            ii_contrib = self.calculate_annual_contribution_ii_pillar(salary_real)
+
+            total_i += self.valorize_i_pillar_capital_real(i_contrib, year, self.current_year)
+            total_ii += self.index_ii_pillar_capital_real(ii_contrib, year, self.current_year)
+        return total_i, total_ii
+
+    def project_future_accumulation_real(self) -> tuple[Decimal, Decimal]:
+        total_i = Decimal("0")
+        total_ii = Decimal("0")
+        retirement_year = self.current_year + self.years_to_standard_retirement
+
+        for year in range(self.current_year, retirement_year):
+            year_delta = year - self.current_year
+            salary_real = self.salary_in_the_past_or_future_real_with_macro(self.current_salary, year_delta)
+            i_contrib = self.calculate_annual_contribution_i_pillar(salary_real)
+            ii_contrib = self.calculate_annual_contribution_ii_pillar(salary_real)
+
+            total_i += self.valorize_i_pillar_capital_real(i_contrib, year, retirement_year)
+            total_ii += self.index_ii_pillar_capital_real(ii_contrib, year, retirement_year)
+        return total_i, total_ii
+
+    # ------------------------------
+    # Łączny kapitał na emeryturę
+    # ------------------------------
+    def calculate_total_retirement_capital(self) -> tuple[Decimal, Decimal]:
+        """Nominalnie."""
+        past_i, past_ii = self.reconstruct_historical_contributions()
+        future_i, future_ii = self.project_future_accumulation()
+
+        retirement_year = self.current_year + self.years_to_standard_retirement
+        past_i_at_ret = self.valorize_i_pillar_capital(past_i, self.current_year, retirement_year)
+        past_ii_at_ret = self.index_ii_pillar_capital(past_ii, self.current_year, retirement_year)
+
+        return past_i_at_ret + future_i, past_ii_at_ret + future_ii
+
+    def calculate_total_retirement_capital_real(self) -> tuple[Decimal, Decimal]:
+        """Realnie."""
+        past_i, past_ii = self.reconstruct_historical_contributions_real()
+        future_i, future_ii = self.project_future_accumulation_real()
+
+        retirement_year = self.current_year + self.years_to_standard_retirement
+        past_i_at_ret = self.valorize_i_pillar_capital_real(past_i, self.current_year, retirement_year)
+        past_ii_at_ret = self.index_ii_pillar_capital_real(past_ii, self.current_year, retirement_year)
+
+        return past_i_at_ret + future_i, past_ii_at_ret + future_ii
+
+    # ------------------------------
+    # Emerytura miesięczna
+    # ------------------------------
+    def _life_expectancy_years_default(self) -> int:
+        retirement_age = self.effective_retirement_age
+        years = (84 - retirement_age) if self.is_male else (88 - retirement_age)
+        return max(1, years)
 
     def calculate_monthly_pension(
         self,
@@ -401,219 +331,135 @@ class PensionModel(BaseModel):
         total_ii_pillar: Optional[Decimal] = None,
         life_expectancy_years: Optional[int] = None,
     ) -> Decimal:
-        """
-        Calculate monthly pension amount using ZUS formula
-
-        ZUS Formula: Monthly Pension = Total Capital / (Life Expectancy in Months)
-
-        Args:
-            total_i_pillar: Total I filar capital (if None, calculates it)
-            total_ii_pillar: Total II filar capital (if None, calculates it)
-            life_expectancy_years: Expected years to live from retirement
-                                   (if None, uses Polish averages: M=84, F=88)
-
-        Returns:
-            Monthly pension amount in PLN
-        """
-        # Calculate totals if not provided
+        """Nominalnie."""
         if total_i_pillar is None or total_ii_pillar is None:
             total_i_pillar, total_ii_pillar = self.calculate_total_retirement_capital()
+        life_expectancy_years = life_expectancy_years or self._life_expectancy_years_default()
+        return (total_i_pillar + total_ii_pillar) / Decimal(str(life_expectancy_years * 12))
 
-        # Calculate life expectancy if not provided
-        if life_expectancy_years is None:
-            # Polish life expectancy averages (approximate)
-            retirement_age = self.effective_retirement_age
-            if self.is_male:
-                life_expectancy_years = 84 - retirement_age
-            else:
-                life_expectancy_years = 88 - retirement_age
+    def calculate_monthly_pension_real(self) -> Decimal:
+        """Realnie."""
+        total_i, total_ii = self.calculate_total_retirement_capital_real()
+        life_expectancy_years = self._life_expectancy_years_default()
+        return (total_i + total_ii) / Decimal(str(life_expectancy_years * 12))
 
-        total_capital = total_i_pillar + total_ii_pillar
+    # ------------------------------
+    # Replacement rate
+    # ------------------------------
+    def get_replacement_rate_nominal(self) -> Decimal:
+        mp = self.calculate_monthly_pension()
+        yrs = self.years_to_standard_retirement
+        final_salary_nom = self.salary_in_the_past_or_future_nominal(self.current_salary, yrs)
+        return (mp / final_salary_nom) if final_salary_nom else Decimal("0")
 
-        life_expectancy_months = life_expectancy_years * 12
+    def get_replacement_rate_real(self) -> Decimal:
+        mp_real = self.calculate_monthly_pension_real()
+        yrs = self.years_to_standard_retirement
+        final_salary_real = self.salary_in_the_past_or_future_real_with_macro(self.current_salary, yrs)
+        return (mp_real / final_salary_real) if final_salary_real else Decimal("0")
 
-        monthly_pension = total_capital / Decimal(str(life_expectancy_months))
-
-        return monthly_pension
-
-    # ========================================================================
-    # UTILITY METHODS
-    # ========================================================================
-
-    def get_replacement_rate(self) -> dict:
-        """
-        Calculate replacement rate: ratio of pension to final salary.
-        Returns both real- and nominal-based rates.
-
-        Returns:
-            {
-                'real': Decimal,     # using final real salary (experience-only)
-                'nominal': Decimal,  # using final nominal salary (incl. inflation)
-            }
-        """
-        monthly_pension = self.calculate_monthly_pension()
-
-        # Estimate final salary (at retirement)
-        years_to_retirement = self.years_to_standard_retirement
-        final_salary_real = self.salary_in_the_past_or_future(
-            year_delta=years_to_retirement, current_salary=self.current_salary
-        )
-        final_salary_nominal = self.salary_in_the_past_or_future_nominal(
-            year_delta=years_to_retirement, current_salary=self.current_salary
-        )
-
-        return {
-            'real': (monthly_pension / final_salary_real) if final_salary_real else Decimal('0'),
-            'nominal': (monthly_pension / final_salary_nominal) if final_salary_nominal else Decimal('0'),
-        }
-
+    # ------------------------------
+    # Szczegóły (obie waluty)
+    # ------------------------------
     def get_detailed_breakdown(self) -> dict:
-        """
-        Get the detailed breakdown of all pension calculations.
-        Adds nominal wage-related fields alongside real ones.
+        # nominal
+        total_i_nom, total_ii_nom = self.calculate_total_retirement_capital()
+        monthly_pension_nom = self.calculate_monthly_pension(total_i_nom, total_ii_nom)
+        rr_nom = self.get_replacement_rate_nominal()
 
-        Returns:
-            Dictionary with all key metrics including real/nominal wage info.
-        """
-        total_i, total_ii = self.calculate_total_retirement_capital()
-        monthly_pension = self.calculate_monthly_pension(total_i, total_ii)
+        # real
+        total_i_real, total_ii_real = self.calculate_total_retirement_capital_real()
+        monthly_pension_real = self.calculate_monthly_pension_real()
+        rr_real = self.get_replacement_rate_real()
 
-        years_to_retirement = self.years_to_standard_retirement
-        final_salary_real = self.salary_in_the_past_or_future(
-            year_delta=years_to_retirement, current_salary=self.current_salary
-        )
-        final_salary_nominal = self.salary_in_the_past_or_future_nominal(
-            year_delta=years_to_retirement, current_salary=self.current_salary
-        )
-
-        replacement_rate = self.get_replacement_rate()
+        yrs = self.years_to_standard_retirement
+        final_salary_nom = self.salary_in_the_past_or_future_nominal(self.current_salary, yrs)
+        final_salary_real = self.salary_in_the_past_or_future_real_with_macro(self.current_salary, yrs)
 
         return {
             "current_age": self.current_age,
             "retirement_age": self.effective_retirement_age,
-            "years_to_retirement": years_to_retirement,
-            "current_monthly_salary": self.current_salary,
-            # Wage endpoints
-            "final_salary_real": final_salary_real,
-            "final_salary_nominal": final_salary_nominal,
-            # Capitals and pension
-            "i_pillar_capital": total_i,
-            "ii_pillar_capital": total_ii,
-            "total_capital": total_i + total_ii,
-            "monthly_pension": monthly_pension,
-            # Replacement rates
-            "replacement_rate_percent": replacement_rate["real"] * Decimal("100"),
-            "replacement_rate_percent_real": replacement_rate["real"] * Decimal("100"),
-            "replacement_rate_percent_nominal": replacement_rate["nominal"] * Decimal("100"),
+            "years_to_retirement": yrs,
+
+            # salaries
+            "current_monthly_salary_nominal": self.current_salary,
+            "final_monthly_salary_nominal": final_salary_nom,
+            "final_monthly_salary_real": final_salary_real,
+
+            # nominal block
+            "i_pillar_capital_nominal": total_i_nom,
+            "ii_pillar_capital_nominal": total_ii_nom,
+            "total_capital_nominal": total_i_nom + total_ii_nom,
+            "monthly_pension_nominal": monthly_pension_nom,
+            "replacement_rate_percent_nominal": rr_nom * Decimal("100"),
+
+            # real block
+            "i_pillar_capital_real": total_i_real,
+            "ii_pillar_capital_real": total_ii_real,
+            "total_capital_real": total_i_real + total_ii_real,
+            "monthly_pension_real": monthly_pension_real,
+            "replacement_rate_percent_real": rr_real * Decimal("100"),
         }
 
+    # ------------------------------
+    # Oś czasu dla obu walut
+    # ------------------------------
     def get_cumulative_capital_by_year(self) -> dict[int, dict]:
-        """
-        Calculate cumulative pension capital for each year from current to retirement.
-        This is used for timeline visualization (MODUŁ 6).
-
-        For each year Y from current_year to retirement_year:
-        - Calculate all contributions from work_start_year to Y
-        - Valorize/index them to year Y
-        - Return accumulated totals
-
-        Returns:
-            Dictionary mapping year → {
-                'age': int,
-                'i_pillar': Decimal,
-                'ii_pillar': Decimal,
-                'total': Decimal,
-                'annual_salary': Decimal,
-                'years_of_experience': int
-            }
-        """
         timeline = {}
         retirement_year = self.current_year + self.years_to_standard_retirement
 
-        # For each year from current to retirement
         for target_year in range(self.current_year, retirement_year + 1):
-            i_pillar_total = Decimal("0")
-            ii_pillar_total = Decimal("0")
+            # NOMINAL: sumujemy po latach pracy do target_year
+            i_nom = Decimal("0")
+            ii_nom = Decimal("0")
+            for y in range(self.work_start_year, target_year):
+                yd = y - self.current_year
+                sal_nom = self.salary_in_the_past_or_future_nominal(self.current_salary, yd)
+                i_con = self.calculate_annual_contribution_i_pillar(sal_nom)
+                ii_con = self.calculate_annual_contribution_ii_pillar(sal_nom)
+                i_nom += self.valorize_i_pillar_capital(i_con, y, target_year)
+                ii_nom += self.index_ii_pillar_capital(ii_con, y, target_year)
 
-            # Calculate contributions from all past working years up to target_year
-            # (includes both historical and future-relative-to-now years)
-            for contribution_year in range(self.work_start_year, target_year):
-                # Calculate year delta for salary estimation
-                year_delta = contribution_year - self.current_year
+            # REAL: analogicznie, ale pensje realne (z makro), a waloryzacja realna
+            i_real = Decimal("0")
+            ii_real = Decimal("0")
+            for y in range(self.work_start_year, target_year):
+                yd = y - self.current_year
+                sal_real = self.salary_in_the_past_or_future_real_with_macro(self.current_salary, yd)
+                i_con_r = self.calculate_annual_contribution_i_pillar(sal_real)
+                ii_con_r = self.calculate_annual_contribution_ii_pillar(sal_real)
+                i_real += self.valorize_i_pillar_capital_real(i_con_r, y, target_year)
+                ii_real += self.index_ii_pillar_capital_real(ii_con_r, y, target_year)
 
-                # Estimate salary for that year
-                salary = self.salary_in_the_past_or_future(
-                    year_delta=year_delta, current_salary=self.current_salary
-                )
-
-                # Calculate contributions
-                i_contribution = self.calculate_annual_contribution_i_pillar(salary)
-                ii_contribution = self.calculate_annual_contribution_ii_pillar(salary)
-
-                # Valorize/index from contribution year to target year
-                i_valorized = self.valorize_i_pillar_capital(
-                    i_contribution, contribution_year, target_year
-                )
-                ii_indexed = self.index_ii_pillar_capital(
-                    ii_contribution, contribution_year, target_year
-                )
-
-                # Add to totals for this target year
-                i_pillar_total += i_valorized
-                ii_pillar_total += ii_indexed
-
-            # Calculate age and experience for this year
-            years_since_current = target_year - self.current_year
-
-            # Get salary for this year (real and nominal)
-            salary_at_year_real = self.salary_in_the_past_or_future(
-                year_delta=years_since_current, current_salary=self.current_salary
-            )
-            salary_at_year_nominal = self.salary_in_the_past_or_future_nominal(
-                year_delta=years_since_current, current_salary=self.current_salary
-            )
-
-            print(f"i_pillar: {i_pillar_total},"
-                  f" ii_pillar: {ii_pillar_total},"
-                  f" total: {i_pillar_total + ii_pillar_total},"
-                  f" annual_salary_real: {salary_at_year_real * Decimal("12")},"
-                  f" annual_salary_nominal: {salary_at_year_nominal * Decimal("12")}")
-
+            # Pensje w roku target_year
+            yrs_since = target_year - self.current_year
+            sal_nom_year  = self.salary_in_the_past_or_future_nominal(self.current_salary, yrs_since)
+            sal_real_year = self.salary_in_the_past_or_future_real_with_macro(self.current_salary, yrs_since)
 
             timeline[target_year] = {
-                "i_pillar": i_pillar_total,
-                "ii_pillar": ii_pillar_total,
-                "total": i_pillar_total + ii_pillar_total,
-                # Add explicit fields
-                "annual_salary_real": salary_at_year_real * Decimal("12"),
-                "annual_salary_nominal": salary_at_year_nominal * Decimal("12"),
+                "i_pillar_nominal": i_nom,
+                "ii_pillar_nominal": ii_nom,
+                "total_nominal": i_nom + ii_nom,
+                "annual_salary_nominal": sal_nom_year * Decimal("12"),
+
+                "i_pillar_real": i_real,
+                "ii_pillar_real": ii_real,
+                "total_real": i_real + ii_real,
+                "annual_salary_real": sal_real_year * Decimal("12"),
             }
 
         return timeline
 
     def get_timeline_for_visualization(self) -> list[dict]:
-        """
-        Get timeline data formatted for frontend visualization.
-        Returns a list sorted by year for easy iteration.
+        tl = self.get_cumulative_capital_by_year()
+        return [{"year": y, **data} for y, data in sorted(tl.items())]
 
-        Returns:
-            List of dictionaries with year-by-year data, sorted by year
-        """
-        timeline_dict = self.get_cumulative_capital_by_year()
 
-        # Convert to list and add year field
-        timeline_list = []
-        for year, data in sorted(timeline_dict.items()):
-            entry = {"year": year, **data}
-            timeline_list.append(entry)
-
-        return timeline_list
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     pension = PensionModel(
         current_age=30,
         years_of_experience=10,
-        current_salary=Decimal("30000"),
+        current_salary=Decimal("30000"),  # miesięcznie, nominalnie
         is_male=True,
         alpha=0.02,
         beta=0.02,
@@ -624,3 +470,7 @@ if __name__ == '__main__':
             ii_pillar_indexation_rate=Decimal("0.02"),
         )
     )
+    breakdown = pension.get_detailed_breakdown()
+    print(breakdown)
+    timeline = pension.get_timeline_for_visualization()
+    print(timeline[:2], "...", timeline[-1] if timeline else None)
