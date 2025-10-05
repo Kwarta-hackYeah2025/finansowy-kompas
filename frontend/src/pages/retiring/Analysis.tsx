@@ -24,10 +24,12 @@ import DialogContent from "@mui/material/DialogContent"
 import DialogActions from "@mui/material/DialogActions"
 import IconButton from "@mui/material/IconButton"
 import CloseIcon from "@mui/icons-material/Close"
+import SendIcon from "@mui/icons-material/Send"
+import SkipNextIcon from "@mui/icons-material/SkipNext"
 import {toast} from "sonner"
 import {useMutation} from "@tanstack/react-query"
-import type {PensionPreviewResponse, SalaryCalculateResponse} from "@/lib/api"
-import {postPensionPreview, postSalaryCalculate} from "@/lib/api"
+import type {PensionPreviewResponse, SalaryCalculateResponse, ExcelPayload} from "@/lib/api"
+import {postPensionPreview, postSalaryCalculate, postExcel} from "@/lib/api"
 import DetailsTiles from "@/pages/retiring/DetailsTiles"
 
 // Define default random events for simulation mode
@@ -91,6 +93,11 @@ const Analysis = () => {
 	// Simulation mode toggle
 	const [simulationEnabled, setSimulationEnabled] = React.useState<boolean>(false)
 	const localSimEvents = React.useMemo(() => DEFAULT_SIM_EVENTS.map(e => ({...e})), [])
+
+	// Excel export modal state
+	const [zipModalOpen, setZipModalOpen] = React.useState<boolean>(false)
+	const [zipCode, setZipCode] = React.useState<string>("")
+	const excelRequestedRef = React.useRef<boolean>(false)
 
 	const back = () => navigate("/emerytura")
 
@@ -390,6 +397,25 @@ const Analysis = () => {
 		},
 	})
 
+	// Excel export mutation
+	const excelMutation = useMutation({
+		mutationFn: (payload: ExcelPayload) => postExcel(payload),
+		onSuccess: () => {
+			toast.success("Dziękujemy! Wyniki zostały zapisane.")
+		},
+		onError: (err: unknown) => {
+			const message = (() => {
+				if (typeof err === 'string') return err
+				if (err && typeof err === 'object') {
+					// @ts-expect-error best-effort extraction
+					return err?.response?.data?.message ?? (err as Error)?.message ?? 'Nie udało się wysłać danych'
+				}
+				return 'Nie udało się wysłać danych'
+			})()
+			toast.error("Błąd wysyłki danych", {description: String(message)})
+		},
+	})
+
 	// Debounced auto-save on change
 	React.useEffect(() => {
 		const timeoutRef = {current: 0 as unknown as ReturnType<typeof setTimeout>}
@@ -450,6 +476,51 @@ const Analysis = () => {
 			cancelled = true
 		}
 	}, [backend, current.wiek, current.wiekEmerytura, current.sex, current.career_start, current.pensjaNetto, storedCoeffs, simulationEnabled, localSimEvents])
+
+	// Build Excel payload from current data and preview
+	const buildExcelPayload = (zip?: string): ExcelPayload => {
+		const retirement_expected = Number(preview?.retirement_age ?? current.wiekEmerytura)
+		const current_age = Number(current.wiek)
+		const sex = current.sex
+		const salary = Number(preview?.final_monthly_salary_nominal ?? backend?.salary ?? current.pensjaNetto ?? 0)
+		const simulation_mode = Boolean(simulationEnabled)
+		const total_capital_real = Number(preview?.total_capital_real ?? 0)
+		const monthly_pension_nominal = Number(preview?.monthly_pension_nominal ?? preview?.monthly_pension ?? 0)
+		const monthly_pension_real = Number(preview?.monthly_pension_real ?? 0)
+		const payload: ExcelPayload = {
+			retirement_expected: Number.isFinite(retirement_expected) ? retirement_expected : 0,
+			current_age: Number.isFinite(current_age) ? current_age : 0,
+			sex: (sex as any) ?? "unknown",
+			salary: Number.isFinite(salary) ? salary : 0,
+			simulation_mode,
+			total_capital_real: Number.isFinite(total_capital_real) ? total_capital_real : 0,
+			monthly_pension_nominal: Number.isFinite(monthly_pension_nominal) ? monthly_pension_nominal : 0,
+			monthly_pension_real: Number.isFinite(monthly_pension_real) ? monthly_pension_real : 0,
+		}
+		if (zip && zip.trim()) payload.zip_code = zip.trim()
+		return payload
+	}
+
+	// Open ZIP modal 3s after preview is available (only once)
+	React.useEffect(() => {
+		if (!preview) return
+		if (excelRequestedRef.current) return
+		const t = setTimeout(() => setZipModalOpen(true), 3000)
+		return () => clearTimeout(t)
+	}, [preview])
+
+	const sendExcelRequest = (zip?: string) => {
+		if (excelRequestedRef.current) return
+		excelRequestedRef.current = true
+		setZipModalOpen(false)
+		excelMutation.mutate(buildExcelPayload(zip))
+	}
+
+	const handleCloseZip = () => {
+		if (!excelRequestedRef.current) {
+			sendExcelRequest(undefined)
+		}
+	}
 
 	const onEditSubmit: SubmitHandler<RetiringFormValues> = (values) => {
 		saveRetiringData(values)
@@ -793,6 +864,50 @@ const Analysis = () => {
 							</svg>
 						)}
 						Zapisz zmiany
+					</Button>
+ 			</DialogActions>
+			</Dialog>
+
+			{/* ZIP Code Modal for Excel export */}
+			<Dialog open={zipModalOpen} onClose={handleCloseZip} fullWidth maxWidth="sm">
+				<DialogTitle className="!pb-2">
+					<div className="flex items-center justify-between">
+						<span>Udostępnij swój kod pocztowy (opcjonalnie)</span>
+						<IconButton aria-label="Zamknij" onClick={handleCloseZip}>
+							<CloseIcon/>
+						</IconButton>
+					</div>
+				</DialogTitle>
+				<DialogContent dividers>
+					<div className="flex flex-col gap-3 pt-1">
+						<p className="text-sm text-muted-foreground">
+							Podaj swój kod pocztowy, aby lepiej dopasować nasze dane do Twojej lokalizacji.
+							To pole jest dobrowolne – jeśli wolisz, możesz pominąć ten krok. Dane zostaną wysłane w każdym przypadku.
+						</p>
+						<div className="flex flex-col gap-2">
+							<Label htmlFor="zipCode">Kod pocztowy (np. 31-111)</Label>
+							<Input id="zipCode" placeholder="31-111" value={zipCode}
+									onChange={(e) => setZipCode(e.target.value)} />
+						</div>
+					</div>
+				</DialogContent>
+				<DialogActions>
+					<Button type="button" variant="outline" onClick={() => sendExcelRequest(undefined)} disabled={excelMutation.isPending}
+							aria-busy={excelMutation.isPending} className="gap-2">
+						<SkipNextIcon fontSize="small"/>
+						Pomiń
+					</Button>
+					<Button type="button" className="bg-emerald-600 hover:bg-emerald-700 gap-2" onClick={() => sendExcelRequest(zipCode)}
+							disabled={excelMutation.isPending} aria-busy={excelMutation.isPending}>
+						{excelMutation.isPending ? (
+							<svg className="size-4 mr-2 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
+								<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+								<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+							</svg>
+						) : (
+							<SendIcon fontSize="small"/>
+						)}
+						Wyślij
 					</Button>
 				</DialogActions>
 			</Dialog>

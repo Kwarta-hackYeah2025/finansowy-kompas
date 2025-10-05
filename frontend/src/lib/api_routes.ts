@@ -10,10 +10,10 @@ export const endpoints = {
   pension: {
     preview: "/api/v1/user-profile/pension/preview",
   },
+  excel: "/api/v1/excel",
 } as const
 
 export function apiUrl(path: string) {
   if (!path.startsWith("/")) return `${API_BASE_URL}/${path}`
   return `${API_BASE_URL}${path}`
 }
-

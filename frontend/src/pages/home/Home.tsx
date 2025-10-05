@@ -7,7 +7,7 @@ import {useNavigate} from "react-router";
 const Home = () => {
 	const navigate = useNavigate();
 	const btnStyles =
-		"px-20 text-2xl h-16 ring-1 ring-white/30 rounded-sm cursor-pointer bg-gradient-to-br from-[#00993f] to-[#007834FF] hover:to-[#ffb34f] transition-colors duration-300";
+		"px-10 md:px-20 text-2xl h-16 ring-1 ring-white/30 rounded-sm cursor-pointer bg-gradient-to-br from-[#00993f] to-[#007834FF] hover:to-[#ffb34f] transition-colors duration-300";
 
 	const slideDown = {
 		hidden: {opacity: 0, y: -100},
@@ -44,7 +44,7 @@ const Home = () => {
 					</div>
 
 					{/* Góra → Dół */}
-					<div className="flex w-full justify-center gap-6 md:gap-8 z-10">
+					<div className="flex-col md:flex-row md:flex w-full justify-center gap-6 md:gap-8 z-10">
 						{["Wartość pieniądza", "Emerytura"].map((text, i) => (
 							<motion.div
 								key={text}

@@ -110,3 +110,24 @@ export async function postPensionPreview(payload: PensionPreviewPayload): Promis
   const res = await api.post(url, payload)
   return res.data as PensionPreviewResponse
 }
+
+// Excel export
+export type ExcelPayload = {
+  retirement_expected: number
+  current_age: number
+  sex: "male" | "female" | "unknown"
+  salary: number
+  simulation_mode: boolean
+  total_capital_real: number
+  monthly_pension_nominal: number
+  monthly_pension_real: number
+  zip_code?: string
+}
+
+export type ExcelResponse = { ok: true } | Record<string, unknown>
+
+export async function postExcel(payload: ExcelPayload): Promise<ExcelResponse> {
+  const url = apiUrl(endpoints.excel)
+  const res = await api.post(url, payload)
+  return (res.data as ExcelResponse) ?? { ok: true }
+}
