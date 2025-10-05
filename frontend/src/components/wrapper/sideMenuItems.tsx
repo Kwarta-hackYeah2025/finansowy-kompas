@@ -1,7 +1,3 @@
-import AppsIcon from '@mui/icons-material/Apps';
-import ContactMailOutlinedIcon from '@mui/icons-material/ContactMailOutlined';
-import LiveHelpOutlinedIcon from '@mui/icons-material/LiveHelpOutlined';
-import ViewStreamOutlinedIcon from '@mui/icons-material/ViewStreamOutlined';
 import ElderlyOutlinedIcon from '@mui/icons-material/ElderlyOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import SavingsOutlinedIcon from '@mui/icons-material/SavingsOutlined';
@@ -32,7 +28,7 @@ export const sideMenuItems: SideMenuItemType[] = [
 	},
 	{
 		path: '/emerytura',
-		label: 'Emerytura',
+		label: 'Symulacja',
 		icon: <ElderlyOutlinedIcon />,
 	},
 ];
