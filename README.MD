@@ -66,24 +66,36 @@ włączenia trybu symulacji zdarzeń losowych.
   wynagrodzeń (nominalnie i realnie), miesięczne wydatki i oszczędności,
   lata doświadczenia, wiek emerytury (możliwe ręczne korekty).
 
+![module_1_basic_data.png](presentation/img/module_1_basic_data.png)
+
 - Moduł II — Uproszczony kalkulator emerytalny
   - Dynamiczny wykres relacji emerytura–historia zatrudnienia (średnie zarobki, staż, wymiar etatu).
   - Porównanie UoP vs. JDG (B2B) przy minimalnych składkach ZUS.
   - Ciekawostki kontekstowe (LLM) — subtelna edukacja użytkownika.
   - Dodatkowo: wykres mediany emerytury dla losowych zawodów.
 
+![module_2_simple_pension_calculator.png](presentation/img/module_2_simple_pension_calculator.png)
+
+![module_2b_median_pensions.png](presentation/img/module_2b_median_pensions.png)
+
 - Moduł III — Wartość pieniądza
   - Wizualizacja wpływu inflacji i oprocentowania na oszczędności/lokaty.
   - Dla porównania: ceny żywności, nieruchomości oraz globalne akcje (ETF).
+
+![module_3_the_value_of_money.png](presentation/img/module_3_the_value_of_money.png)
 
 - Moduł IV — Rozszerzony kalkulator emerytalny
   - Pełnia danych użytkownika (własne + modelowe) i kluczowe parametry:
   kapitał I/II filara, ścieżka zarobków, prognoza emerytury i „stopa zastąpienia”
   (realna zmiana przychodu w momencie przejścia na emeryturę).
 
+![module_4_extended_pension_calculator.png](presentation/img/module_4_extended_pension_calculator.png)
+
 - Moduł V — Symulacja zdarzeń losowych
   - Opcjonalne zdarzenia (bezrobocie, choroba, praca za granicą bez ZUS,
   niepełny etat itp.) wpływają na wyliczenia modułu IV.
+
+![module_5_random_events.png](presentation/img/module_5_random_events.png)
 
 - Moduł VI — Zbieranie statystyk i raport `.xlsx`
   - MVP bez autoryzacji/bazy, za to z anonimowymi statystykami dla administratora
@@ -211,9 +223,12 @@ Frontend wizualizuje te okresy jako zacienione pasy na osi czasu. Backend (na ż
 
 
 ## 10. Modele i równania
+
 Empiryczny model wzrostu płacy wraz z doświadczeniem (wysycenie):
 - k(x) = 1 + α · (1 − e^(−β·x))
 - gdzie: `x` — lata doświadczenia, a „pensja = pensja_juniora · k(x)`.
+
+![experience_multiplier.png](presentation/img/experience_multiplier.png)
 
 Na potrzeby wykresów rozdzielamy wartości nominalne oraz realne (urealnione o inflację). Zastosowanie danych makro (inflacja, dynamika płac, itp.) pozwala na bardziej realistyczne projekcje.
 
@@ -285,9 +300,12 @@ Most public pension calculators (as of 2025) ask for many inputs that are hard t
 - The frontend visualizes results as charts and cards, with an optional simulation mode for random events.
 
 ## 3. App modules (MVP)
+
 - Module I — Basic data
   - Minimal info: profession/industry, location, age.
   - The system proposes an initial financial model: wage projection (nominal/real), monthly expenses and savings, years of experience, retirement age (manually adjustable).
+
+![module_1_basic_data.png](presentation/img/module_1_basic_data.png)
 
 - Module II — Simple pension calculator
   - Dynamic chart of pension vs. employment history (average pay, tenure, working time).
@@ -295,15 +313,25 @@ Most public pension calculators (as of 2025) ask for many inputs that are hard t
   - Contextual fun facts (LLM) for subtle education.
   - Additionally: median pension chart for random professions.
 
+![module_2_simple_pension_calculator.png](presentation/img/module_2_simple_pension_calculator.png)
+
+![module_2b_median_pensions.png](presentation/img/module_2b_median_pensions.png)
+
 - Module III — Value of money
   - Visualizes the impact of inflation and interest rates on savings/deposits.
   - For reference: food, real estate prices and global equities (ETF).
 
+![module_3_the_value_of_money.png](presentation/img/module_3_the_value_of_money.png)
+
 - Module IV — Extended pension calculator
   - Full user and model data with key parameters: Pillar I/II capital, wage path, pension forecast, and replacement rate (real change in income at retirement).
 
+![module_4_extended_pension_calculator.png](presentation/img/module_4_extended_pension_calculator.png)
+
 - Module V — Random events simulation
   - Optional events (unemployment, illness, work abroad without ZUS, part‑time, etc.) affect Module IV calculations.
+
+![module_5_random_events.png](presentation/img/module_5_random_events.png)
 
 - Module VI — Stats and `.xlsx` report
   - MVP has no auth/DB; it saves anonymous stats for the admin (Excel report as per assignment requirements).
@@ -390,6 +418,8 @@ The frontend shows these periods as shaded bands on the timeline. The backend (o
 Empirical wage growth with experience (saturation):
 - k(x) = 1 + α · (1 − e^(−β·x))
 - where `x` is years of experience, and `salary = junior_salary · k(x)`.
+
+![experience_multiplier.png](presentation/img/experience_multiplier.png)
 
 We separate nominal and real values (inflation-adjusted). Macro data (inflation, wage dynamics, etc.) enables more realistic projections.
 
