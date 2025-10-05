@@ -231,14 +231,51 @@ const Analysis = () => {
 	}, [preview, points, current.wiek, simulationEnabled, localSimEvents])
 
 	const bandColors: Record<'zero' | 'partial', string> = {
-		zero: 'rgba(239, 68, 68, 0.18)', // red-500 @ 18%
-		partial: 'rgba(234, 179, 8, 0.18)', // amber-500 @ 18%
+		zero: 'rgba(239, 68, 68, 0.25)', // red-500 @ 25%
+		partial: 'rgba(234, 179, 8, 0.20)', // amber-500 @ 20%
+	}
+	const bandEdges: Record<'zero' | 'partial', string> = {
+		zero: 'rgba(239, 68, 68, 0.6)',
+		partial: 'rgba(234, 179, 8, 0.5)',
 	}
 
-	// Filter points to approximately every 5 years (always include last)
+	// When there are simulation events, use step chart to make flat sections more visible
+	const areaType = React.useMemo(() => (eventBands.length > 0 ? 'stepAfter' : 'linear'), [eventBands.length])
+
+	// Build visualization points; when event bands exist, flatten values across those ranges for clarity
+	const vizPoints = React.useMemo(() => {
+		if (!points?.length || !eventBands.length) return points
+		const out = points.map(p => ({...p}))
+		for (const b of eventBands) {
+			const fromYear = Math.ceil(b.from)
+			const toYear = Math.floor(b.to)
+			let startIdx = out.findIndex(p => Number(p.rok) >= fromYear)
+			if (startIdx === -1) continue
+			let endIdx = -1
+			for (let i = out.length - 1; i >= 0; i--) {
+				if (Number(out[i].rok) <= toYear) { endIdx = i; break }
+			}
+			if (endIdx < startIdx) continue
+			const base = out[Math.max(0, startIdx - 1)] ?? out[startIdx]
+			for (let i = startIdx; i <= endIdx; i++) {
+				out[i].annual_salary = base.annual_salary
+				out[i].annual_salary_real = base.annual_salary_real
+				out[i].i_pillar = base.i_pillar
+				out[i].ii_pillar = base.ii_pillar
+				out[i].total = base.total
+				out[i].i_pillar_real = base.i_pillar_real
+				out[i].ii_pillar_real = base.ii_pillar_real
+				out[i].total_real = base.total_real
+			}
+		}
+		return out
+	}, [points, eventBands])
+
+	// Filter points to approximately every 5 years (always include last); when there are event bands, use full data for fidelity
 	const points5 = React.useMemo(() => {
-		const arr = points
+		const arr = vizPoints
 		if (!arr?.length) return arr
+		if (eventBands.length > 0) return arr
 		const first = arr[0]?.rok
 		const last = arr[arr.length - 1]?.rok
 		const out = arr.filter(p => Number.isFinite(p.rok) && ((p.rok - first) % 5 === 0))
@@ -246,7 +283,7 @@ const Analysis = () => {
 			out.push(arr[arr.length - 1])
 		}
 		return out
-	}, [points])
+	}, [vizPoints, eventBands.length])
 
 	// Right Y-axis domain should start at -20% relative to the first annual salary value
 	const rightAxisMin = React.useMemo(() => {
@@ -447,7 +484,7 @@ const Analysis = () => {
 								<span className="text-muted-foreground">{e.start_age}–{e.end_age} lat</span>
 								<span className="inline-flex items-center gap-1">
 									<span className="h-1.5 w-1.5 rounded-full"
-												style={{backgroundColor: zero ? 'rgb(239 68 68)' : 'rgb(234 179 8)'}}/>
+											style={{backgroundColor: zero ? 'rgb(239 68 68)' : 'rgb(234 179 8)'}}/>
 									{zero ? '0%' : `${Math.round(Number(e.contrib_multiplier) * 100)}%`}
 								</span>
 								<span className="rounded bg-black/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{e.kind}</span>
@@ -551,7 +588,7 @@ const Analysis = () => {
 							<div className="flex items-center justify-between bg-white rounded-lg border p-3">
 								<label className="flex items-center gap-2 select-none">
 									<input type="checkbox" className="size-4 rounded border" checked={simulationEnabled}
-												 onChange={(e) => setSimulationEnabled(e.target.checked)}/>
+											 onChange={(e) => setSimulationEnabled(e.target.checked)}/>
 									<span className="text-sm">Uwzględnij nieprzewidziane zdarzenia losowe</span>
 								</label>
 								<div className="text-xs text-muted-foreground">wpływają na wysokość składek i kapitału</div>
@@ -583,40 +620,41 @@ const Analysis = () => {
 										<CartesianGrid strokeDasharray="3 3"/>
 										<XAxis dataKey="rok" tickMargin={8} ticks={xTicks5}/>
 										<YAxis yAxisId="left" tickMargin={8} tickCount={10}
-													 tickFormatter={(v: number) => formatYAxisShort(v)}/>
+												 tickFormatter={(v: number) => formatYAxisShort(v)}/>
 										<YAxis yAxisId="right" orientation="right" tickMargin={8} tickCount={10}
-													 tickFormatter={(v: number) => formatYAxisShort(v)} domain={[rightAxisMin, 'auto']}/>
+												 tickFormatter={(v: number) => formatYAxisShort(v)} domain={[rightAxisMin, 'auto']}/>
 										<ChartTooltip content={<CustomTooltip/>}/>
 
 										{/* Simulation event bands (under series) */}
 										{eventBands.map((b, idx) => (
-											<ReferenceArea key={`band-${idx}`} x1={b.from} x2={b.to} strokeOpacity={0}
-																		 fill={bandColors[b.type]}/>
+											<ReferenceArea key={`band-${idx}`} x1={b.from} x2={b.to}
+													 stroke={bandEdges[b.type]} strokeOpacity={0.9} strokeWidth={1}
+													 fill={bandColors[b.type]}/>
 										))}
 
 										{/* Salary: nominal (filled) and real (line) on right axis */}
-										<Area yAxisId="right" type="monotone" dataKey="annual_salary" stroke="var(--color-annual_salary)"
-													fill={`url(#${gradAnnual})`} strokeWidth={2}/>
-										<Area yAxisId="right" type="monotone" dataKey="annual_salary_real"
-													stroke="var(--color-annual_salary_real)" fill="transparent" strokeWidth={2}
-													strokeDasharray="4 3"/>
+										<Area yAxisId="right" type={areaType} dataKey="annual_salary" stroke="var(--color-annual_salary)"
+												fill={`url(#${gradAnnual})`} strokeWidth={2}/>
+										<Area yAxisId="right" type={areaType} dataKey="annual_salary_real"
+												stroke="var(--color-annual_salary_real)" fill="transparent" strokeWidth={2}
+												strokeDasharray="4 3"/>
 
 										{/* Pillars: nominal stacked, real as lines */}
-										<Area yAxisId="left" type="monotone" dataKey="i_pillar" stackId="nominal"
-													stroke="var(--color-i_pillar)" fill={`url(#${gradiPillar})`} strokeWidth={2}/>
-										<Area yAxisId="left" type="monotone" dataKey="ii_pillar" stackId="nominal"
-													stroke="var(--color-ii_pillar)" fill={`url(#${gradiiPillar})`} strokeWidth={2}/>
+										<Area yAxisId="left" type={areaType} dataKey="i_pillar" stackId="nominal"
+												stroke="var(--color-i_pillar)" fill={`url(#${gradiPillar})`} strokeWidth={2}/>
+										<Area yAxisId="left" type={areaType} dataKey="ii_pillar" stackId="nominal"
+												stroke="var(--color-ii_pillar)" fill={`url(#${gradiiPillar})`} strokeWidth={2}/>
 
-										<Area yAxisId="left" type="monotone" dataKey="i_pillar_real" stroke="var(--color-i_pillar_real)"
-													fill="transparent" strokeWidth={2} strokeDasharray="4 3"/>
-										<Area yAxisId="left" type="monotone" dataKey="ii_pillar_real" stroke="var(--color-ii_pillar_real)"
-													fill="transparent" strokeWidth={2} strokeDasharray="4 3"/>
+										<Area yAxisId="left" type={areaType} dataKey="i_pillar_real" stroke="var(--color-i_pillar_real)"
+												fill="transparent" strokeWidth={2} strokeDasharray="4 3"/>
+										<Area yAxisId="left" type={areaType} dataKey="ii_pillar_real" stroke="var(--color-ii_pillar_real)"
+												fill="transparent" strokeWidth={2} strokeDasharray="4 3"/>
 
 										{/* Totals */}
-										<Area yAxisId="left" type="monotone" dataKey="total" stroke="var(--color-total)"
-													fill={`url(#${gradTotal})`} strokeWidth={2}/>
-										<Area yAxisId="left" type="monotone" dataKey="total_real" stroke="var(--color-total_real)"
-													fill="transparent" strokeWidth={2} strokeDasharray="4 3"/>
+										<Area yAxisId="left" type={areaType} dataKey="total" stroke="var(--color-total)"
+												fill={`url(#${gradTotal})`} strokeWidth={2}/>
+										<Area yAxisId="left" type={areaType} dataKey="total_real" stroke="var(--color-total_real)"
+												fill="transparent" strokeWidth={2} strokeDasharray="4 3"/>
 
 										<ChartLegend content={<ChartLegendContent/>}/>
 									</AreaChart>
@@ -626,14 +664,14 @@ const Analysis = () => {
 								{eventBands.length > 0 && (
 									<div className="flex items-center gap-4 text-xs text-muted-foreground">
 										<div className="flex items-center gap-2"><span className="inline-block w-3 h-3 rounded-[2px]"
-																																	 style={{backgroundColor: bandColors.zero}}/> przerwa
-											w składkach (0%)
+															 style={{backgroundColor: bandColors.zero}}/> przerwa
+												w składkach (0%)
+											</div>
+											<div className="flex items-center gap-2"><span className="inline-block w-3 h-3 rounded-[2px]"
+															 style={{backgroundColor: bandColors.partial}}/> ograniczone
+												składki (&lt;100%)
+											</div>
 										</div>
-										<div className="flex items-center gap-2"><span className="inline-block w-3 h-3 rounded-[2px]"
-																																	 style={{backgroundColor: bandColors.partial}}/> ograniczone
-											składki (&lt;100%)
-										</div>
-									</div>
 								)}
 
 								<div className="text-xs text-muted-foreground">
@@ -666,7 +704,7 @@ const Analysis = () => {
 				</DialogTitle>
 				<DialogContent dividers>
 					<form id="analysis-edit-form" onSubmit={editForm.handleSubmit(onEditSubmit)}
-								className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+							className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="stanowisko" required>Stanowisko</Label>
 							<Input id="stanowisko" {...editForm.register("stanowisko")} />
@@ -677,7 +715,7 @@ const Analysis = () => {
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="wiek" required>Wiek</Label>
 							<Input id="wiek" type="number" inputMode="numeric" min={16}
-										 max={100} {...editForm.register("wiek", {valueAsNumber: true})} />
+									 max={100} {...editForm.register("wiek", {valueAsNumber: true})} />
 							{editForm.formState.errors.wiek && (
 								<p className="text-destructive text-xs">{editForm.formState.errors.wiek.message}</p>
 							)}
@@ -692,7 +730,7 @@ const Analysis = () => {
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="pensjaNetto" required>Pensja netto (PLN/mies.)</Label>
 							<Input id="pensjaNetto" type="number" inputMode="decimal" step="0.01"
-										 min={0} {...editForm.register("pensjaNetto", {valueAsNumber: true})} />
+									 min={0} {...editForm.register("pensjaNetto", {valueAsNumber: true})} />
 							{editForm.formState.errors.pensjaNetto && (
 								<p className="text-destructive text-xs">{editForm.formState.errors.pensjaNetto.message}</p>
 							)}
@@ -700,7 +738,7 @@ const Analysis = () => {
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="wydatkiMiesieczne" required>Wydatki miesięczne (PLN)</Label>
 							<Input id="wydatkiMiesieczne" type="number" inputMode="decimal" step="0.01"
-										 min={0} {...editForm.register("wydatkiMiesieczne", {valueAsNumber: true})} />
+									 min={0} {...editForm.register("wydatkiMiesieczne", {valueAsNumber: true})} />
 							{editForm.formState.errors.wydatkiMiesieczne && (
 								<p className="text-destructive text-xs">{editForm.formState.errors.wydatkiMiesieczne.message}</p>
 							)}
@@ -708,7 +746,7 @@ const Analysis = () => {
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="stopaZwrotu" required>Przewidywana stopa zwrotu (% rocznie)</Label>
 							<Input id="stopaZwrotu" type="number" inputMode="decimal" step="0.01" min={-50}
-										 max={50} {...editForm.register("stopaZwrotu", {valueAsNumber: true})} />
+									 max={50} {...editForm.register("stopaZwrotu", {valueAsNumber: true})} />
 							{editForm.formState.errors.stopaZwrotu && (
 								<p className="text-destructive text-xs">{editForm.formState.errors.stopaZwrotu.message}</p>
 							)}
@@ -716,7 +754,7 @@ const Analysis = () => {
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="wiekEmerytura" required>Wiek emerytalny</Label>
 							<Input id="wiekEmerytura" type="number" inputMode="numeric" min={40}
-										 max={85} {...editForm.register("wiekEmerytura", {valueAsNumber: true})} />
+									 max={85} {...editForm.register("wiekEmerytura", {valueAsNumber: true})} />
 							{editForm.formState.errors.wiekEmerytura && (
 								<p className="text-destructive text-xs">{editForm.formState.errors.wiekEmerytura.message}</p>
 							)}
@@ -724,7 +762,7 @@ const Analysis = () => {
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="sex" required>Płeć</Label>
 							<select id="sex"
-											className="flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring" {...editForm.register("sex")}>
+									className="flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring" {...editForm.register("sex")}>
 								<option value="male">Mężczyzna</option>
 								<option value="female">Kobieta</option>
 								<option value="unknown">Nie chcę podawać</option>
@@ -736,7 +774,7 @@ const Analysis = () => {
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="career_start" required>Wiek startu kariery</Label>
 							<Input id="career_start" type="number" inputMode="numeric" min={10}
-										 max={80} {...editForm.register("career_start", {valueAsNumber: true})} />
+									 max={80} {...editForm.register("career_start", {valueAsNumber: true})} />
 							{editForm.formState.errors.career_start && (
 								<p className="text-destructive text-xs">{editForm.formState.errors.career_start.message}</p>
 							)}
@@ -747,7 +785,7 @@ const Analysis = () => {
 					<Button type="button" variant="outline" onClick={onClear} disabled={saveMutation.isPending}>Wyczyść
 						dane</Button>
 					<Button type="submit" form="analysis-edit-form" className="bg-[#007834FF]" disabled={saveMutation.isPending}
-									aria-busy={saveMutation.isPending}>
+								aria-busy={saveMutation.isPending}>
 						{saveMutation.isPending && (
 							<svg className="size-4 mr-2 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
 								<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
