@@ -9,25 +9,11 @@ const Home = () => {
 	const btnStyles =
 		"px-20 text-2xl h-16 ring-1 ring-white/30 rounded-sm cursor-pointer bg-gradient-to-br from-[#00993f] to-[#007834FF] hover:to-[#ffb34f] transition-colors duration-300";
 
-	// warianty jako zwykły obiekt (bez wymuszenia typu Variants)
-	const slideUp = {
-		hidden: {opacity: 0, y: 100},
-		visible: (i: number) => ({
-			opacity: 1,
-			y: 0,
-			transition: {
-				delay: i * 0.5,
-				duration: 1,
-				ease: "easeOut",
-			},
-		}),
-	} as const;
-
 	const slideDown = {
 		hidden: {opacity: 0, y: -100},
 		visible: (i: number) => ({
 			opacity: 1,
-			y: 0,
+			y: 20,
 			transition: {
 				delay: i * 0.5,
 				duration: 1,
@@ -46,39 +32,24 @@ const Home = () => {
 			/>
 			<div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"/>
 
-			<div className="absolute inset-0 flex flex-col items-end justify-center text-center space-y-10">
+			<div className="absolute inset-0 flex flex-col items-center md:items-end justify-center text-center space-y-10">
 				{/* Dół → Góra */}
-				<div className="w-[500px] mr-10">
-					<div className="flex w-full justify-between gap-8">
-						{["Inflacja", "PPK"].map((text, i) => (
-							<motion.div
-								key={text}
-								custom={i}
-								// @ts-ignore
-								variants={slideUp}
-								initial="hidden"
-								animate="visible"
-							>
-								<Button className={btnStyles}>{text}</Button>
-							</motion.div>
-						))}
-					</div>
-
+				<div className="w-full">
 					{/* Tekst główny */}
-					<div className="backdrop-blur-sm bg-black/35 rounded-md px-8 pb-8 ring-1 ring-white/30 z-20 w-full">
+					<div className="backdrop-blur-sm bg-black/35 px-8 pb-8 ring-1 ring-white/30 z-20 w-full">
 						<span
-							className="text-6xl whitespace-pre-wrap font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-300 via-stone-300 to-amber-300 transition-colors duration-700 hover:from-sky-300 hover:via-emerald-300 hover:to-lime-300">
-							<span className="text-2xl">Witaj w{'\n'}</span> Finansowym{'\n'} Kompasie!
+							className="text-5xl md:text-6xl whitespace-pre-wrap font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-300 via-stone-300 to-amber-300 transition-colors duration-700 hover:from-sky-300 hover:via-emerald-300 hover:to-lime-300">
+							<span className="text-xl md:text-2xl">Witaj w{'\n'}</span> Finansowym{'\n'} Kompasie!
 						</span>
 					</div>
 
 					{/* Góra → Dół */}
-					<div className="flex w-full justify-between gap-8 z-10">
-						{["Giełda", "Lokaty"].map((text, i) => (
+					<div className="flex w-full justify-center gap-6 md:gap-8 z-10">
+						{["Wartość pieniądza", "Emerytura"].map((text, i) => (
 							<motion.div
 								key={text}
 								custom={i}
-								// @ts-ignore
+								// @ts-expect-error framer-motion dynamic variants typing
 								variants={slideDown}
 								initial="hidden"
 								animate="visible"
@@ -86,19 +57,31 @@ const Home = () => {
 								<Button className={btnStyles}>{text}</Button>
 							</motion.div>
 						))}
+
+						{/* CTA: przeniesione tutaj, responsywne i z pulsującym highlightem */}
+
 					</div>
+					<motion.div
+						custom={3}
+						// @ts-expect-error framer-motion dynamic variants typing
+						variants={slideDown}
+						initial="hidden"
+						animate="visible"
+						className="mx-auto mt-10 w-fit"
+					>
+						<div id="box" className="gradient-border pulse-ring text-3xl z-10">
+							<Button
+								onClick={() => navigate("/emerytura")}
+								className="w-full leading-4 uppercase whitespace-pre-wrap h-full text-xl md:text-2xl rounded-[3rem] cursor-pointer bg-gradient-to-t from-stone-100 to-stone-300 text-emerald-950 hover:shadow-2xl hover:text-emerald-800 py-4 px-10"
+								variant="secondary"
+							>
+								Rozpocznij analizę {'\n'} swojej przyszłości...
+							</Button>
+						</div>
+					</motion.div>
 				</div>
 			</div>
-			<div className="absolute top-3/4 left-14 md:left-25 md:top-[40%]">
-				<div className="relative">
-					<div id="box" className="gradient-border text-3xl z-10">
-						<Button onClick={() => navigate("/emerytura")}
-										className="w-full whitespace-pre-wrap h-full text-2xl rounded-[3px] cursor-pointer bg-gradient-to-t from-stone-100 to-stone-300 text-emerald-950 hover:shadow-2xl hover:text-emerald-800"
-										variant="secondary">Rozpocznij analizę {"\n"} swojej
-							przyszłości...</Button>
-					</div>
-				</div>
-			</div>
+			{/* Usunięto absolutnie pozycjonowany CTA, aby nie nachodził na treść */}
 		</div>
 	);
 };

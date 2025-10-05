@@ -149,36 +149,6 @@ const Retiring = () => {
 						</div>
 
 						<div className="flex flex-col gap-2">
-							<Label htmlFor="wydatkiMiesieczne" required>Wydatki miesięczne (PLN)</Label>
-							<Input id="wydatkiMiesieczne" type="number" inputMode="decimal" step="0.01"
-									 min={0} {...register("wydatkiMiesieczne", {valueAsNumber: true})} />
-							{errors.wydatkiMiesieczne &&
-								<p className="text-destructive text-sm">{errors.wydatkiMiesieczne.message}</p>}
-						</div>
-
-						<div className="flex flex-col gap-2">
-							<Label htmlFor="oszczednosci" required>Oszczędności (PLN)</Label>
-							<Input id="oszczednosci" type="number" inputMode="decimal" step="0.01"
-									 min={0} {...register("oszczednosci", {valueAsNumber: true})} />
-							{errors.oszczednosci && <p className="text-destructive text-sm">{errors.oszczednosci.message}</p>}
-						</div>
-
-						<div className="flex flex-col gap-2">
-							<Label htmlFor="procentOszczednosci" required>Procent oszczędności (% z pensji)</Label>
-							<Input id="procentOszczednosci" type="number" inputMode="decimal" step="0.01" min={0}
-									 max={100} {...register("procentOszczednosci", {valueAsNumber: true})} />
-							{errors.procentOszczednosci &&
-								<p className="text-destructive text-sm">{errors.procentOszczednosci.message}</p>}
-						</div>
-
-						<div className="flex flex-col gap-2">
-							<Label htmlFor="stopaZwrotu" required>Przewidywana stopa zwrotu z inwestycji (% rocznie)</Label>
-							<Input id="stopaZwrotu" type="number" inputMode="decimal" step="0.01" min={-50}
-									 max={50} {...register("stopaZwrotu", {valueAsNumber: true})} />
-							{errors.stopaZwrotu && <p className="text-destructive text-sm">{errors.stopaZwrotu.message}</p>}
-						</div>
-
-						<div className="flex flex-col gap-2">
 							<Label htmlFor="wiekEmerytura" required>Planowany wiek przejścia na emeryturę</Label>
 							<Input id="wiekEmerytura" type="number" inputMode="numeric" min={40}
 									 max={85} {...register("wiekEmerytura", {valueAsNumber: true})} />
