@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 from typing import Optional
+import logging
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -9,6 +10,7 @@ from backend.models.pension_models.MacroeconomicFactors import MacroeconomicFact
 from backend.models.pension_models.RetirementAgeConfig import RetirementAgeConfig
 from backend.models.pension_models.ZUSContributionRates import ZUSContributionRates
 
+logger = logging.getLogger(__name__)
 
 class PensionModel(BaseModel):
     """User profile with basic demographic info"""
@@ -43,25 +45,20 @@ class PensionModel(BaseModel):
         self, current_salary: Decimal, year_delta: int
     ) -> Decimal:
         """
-        Calculates the salary year_delta years from now
-        (negative for past, positive for future)
-        Based on experience curve, NOT accounting for macroeconomic factors
+        Calculates the REAL (constant-price) salary year_delta years from now
+        (negative for past, positive for future) using only the experience curve.
 
         The experience multiplier is a saturation curve, NOT pure exponential.
         Therefore we must use the ratio method: S_then = S_now * (m(exp_then) / m(exp_now))
 
         Args:
-            current_salary: Current annual gross salary
+            current_salary: Current gross salary (monthly or annual — consistent usage)
             year_delta: Years from current year (can be negative)
 
         Returns:
-            Estimated gross salary for that year
+            Estimated gross salary for that year in real terms (without inflation)
         """
-        # Calculate ABSOLUTE experience at target time
-        experience_then = self.years_of_experience + year_delta
-
-        # Don't allow negative experience
-        experience_then = max(0, experience_then)
+        experience_then = max(0, self.years_of_experience + year_delta)
 
         # Get multiplier at target experience level
         multiplier_then = experience_multiplier(
@@ -78,6 +75,56 @@ class PensionModel(BaseModel):
         )
 
         return current_salary * Decimal(str(multiplier_then / multiplier_now))
+
+    # ------------------------------
+    # Nominal wage helpers & salary
+    # ------------------------------
+    def _nominal_wage_growth_rate_for_year(self, year: int) -> Decimal:
+        """
+        Resolve nominal wage growth rate for a given year.
+        Uses historical data if available; otherwise falls back to default
+        nominal_wage_growth_rate from MacroeconomicFactors.
+        """
+        year_str = str(year)
+        if year_str in self.macroeconomic_factors.historical_data:
+            infl, real_growth, *_ = self.macroeconomic_factors.historical_data[year_str]
+            return infl + real_growth
+        return self.macroeconomic_factors.nominal_wage_growth_rate
+
+    def _cumulative_nominal_growth(self, from_year: int, to_year: int) -> Decimal:
+        """
+        Compute cumulative nominal wage growth factor between two years.
+        - If to_year > from_year: ∏ (1 + g_y) for y in [from_year, to_year)
+        - If to_year < from_year: ∏ (1 / (1 + g_y)) for y in [to_year, from_year)
+        - If equal: 1
+        """
+        factor = Decimal("1")
+        if to_year > from_year:
+            for y in range(from_year, to_year):
+                rate = self._nominal_wage_growth_rate_for_year(y)
+                factor *= (Decimal("1") + rate)
+        elif to_year < from_year:
+            for y in range(to_year, from_year):
+                rate = self._nominal_wage_growth_rate_for_year(y)
+                factor /= (Decimal("1") + rate)
+        return factor
+
+    def salary_in_the_past_or_future_nominal(
+        self, current_salary: Decimal, year_delta: int
+    ) -> Decimal:
+        """
+        Calculates the NOMINAL salary year_delta years from now by:
+        1) Adjusting for experience curve (real effect)
+        2) Applying cumulative nominal wage growth (inflation + real macro growth)
+        """
+        # Step 1: real, experience-based salary change
+        real_salary = self.salary_in_the_past_or_future(current_salary, year_delta)
+
+        # Step 2: apply nominal macro factor from current_year to target year
+        target_year = self.current_year + year_delta
+        nominal_factor = self._cumulative_nominal_growth(self.current_year, target_year)
+
+        return (real_salary * nominal_factor)
 
     @computed_field  # type: ignore
     @property
@@ -109,7 +156,7 @@ class PensionModel(BaseModel):
         Returns:
             Annual contribution to I filar
         """
-        return gross_salary * self.zus_contribution_rate.i_pillar_rate
+        return gross_salary * self.zus_contribution_rate.i_pillar_rate * Decimal('12')
 
     def calculate_annual_contribution_ii_pillar(self, gross_salary: Decimal) -> Decimal:
         """
@@ -121,7 +168,7 @@ class PensionModel(BaseModel):
         Returns:
             Annual contribution to II filar
         """
-        return gross_salary * self.zus_contribution_rate.ii_pillar_rate
+        return gross_salary * self.zus_contribution_rate.ii_pillar_rate * Decimal('12')
 
     # ========================================================================
     # VALORIZATION & INDEXATION RATE RETRIEVAL
@@ -381,13 +428,10 @@ class PensionModel(BaseModel):
             else:
                 life_expectancy_years = 88 - retirement_age
 
-        # Total capital = I filar + II filar
         total_capital = total_i_pillar + total_ii_pillar
 
-        # Convert years to months
         life_expectancy_months = life_expectancy_years * 12
 
-        # Calculate monthly pension
         monthly_pension = total_capital / Decimal(str(life_expectancy_months))
 
         return monthly_pension
@@ -396,48 +440,71 @@ class PensionModel(BaseModel):
     # UTILITY METHODS
     # ========================================================================
 
-    def get_replacement_rate(self) -> Decimal:
+    def get_replacement_rate(self) -> dict:
         """
-        Calculate replacement rate: ratio of pension to final salary
+        Calculate replacement rate: ratio of pension to final salary.
+        Returns both real- and nominal-based rates.
 
         Returns:
-            Replacement rate as decimal (e.g., 0.45 = 45%)
+            {
+                'real': Decimal,     # using final real salary (experience-only)
+                'nominal': Decimal,  # using final nominal salary (incl. inflation)
+            }
         """
         monthly_pension = self.calculate_monthly_pension()
 
         # Estimate final salary (at retirement)
         years_to_retirement = self.years_to_standard_retirement
-        final_salary = self.salary_in_the_past_or_future(
+        final_salary_real = self.salary_in_the_past_or_future(
             year_delta=years_to_retirement, current_salary=self.current_salary
         )
-        monthly_final_salary = final_salary / Decimal("12")
+        final_salary_nominal = self.salary_in_the_past_or_future_nominal(
+            year_delta=years_to_retirement, current_salary=self.current_salary
+        )
 
-        if monthly_final_salary == 0:
-            return Decimal("0")
-
-        return monthly_pension / monthly_final_salary
+        return {
+            'real': (monthly_pension / final_salary_real) if final_salary_real else Decimal('0'),
+            'nominal': (monthly_pension / final_salary_nominal) if final_salary_nominal else Decimal('0'),
+        }
 
     def get_detailed_breakdown(self) -> dict:
         """
-        Get the detailed breakdown of all pension calculations
+        Get the detailed breakdown of all pension calculations.
+        Adds nominal wage-related fields alongside real ones.
 
         Returns:
-            Dictionary with all key metrics
+            Dictionary with all key metrics including real/nominal wage info.
         """
         total_i, total_ii = self.calculate_total_retirement_capital()
         monthly_pension = self.calculate_monthly_pension(total_i, total_ii)
+
+        years_to_retirement = self.years_to_standard_retirement
+        final_salary_real = self.salary_in_the_past_or_future(
+            year_delta=years_to_retirement, current_salary=self.current_salary
+        )
+        final_salary_nominal = self.salary_in_the_past_or_future_nominal(
+            year_delta=years_to_retirement, current_salary=self.current_salary
+        )
+
         replacement_rate = self.get_replacement_rate()
 
         return {
             "current_age": self.current_age,
             "retirement_age": self.effective_retirement_age,
-            "years_to_retirement": self.years_to_standard_retirement,
-            "current_monthly_salary": self.current_salary / Decimal("12"),
+            "years_to_retirement": years_to_retirement,
+            "current_monthly_salary": self.current_salary,
+            # Wage endpoints
+            "final_salary_real": final_salary_real,
+            "final_salary_nominal": final_salary_nominal,
+            # Capitals and pension
             "i_pillar_capital": total_i,
             "ii_pillar_capital": total_ii,
             "total_capital": total_i + total_ii,
             "monthly_pension": monthly_pension,
-            "replacement_rate_percent": replacement_rate * Decimal("100"),
+            # Replacement rates
+            "replacement_rate_percent": replacement_rate["real"] * Decimal("100"),
+            "replacement_rate_percent_real": replacement_rate["real"] * Decimal("100"),
+            "replacement_rate_percent_nominal": replacement_rate["nominal"] * Decimal("100"),
         }
 
     def get_cumulative_capital_by_year(self) -> dict[int, dict]:
@@ -497,19 +564,29 @@ class PensionModel(BaseModel):
 
             # Calculate age and experience for this year
             years_since_current = target_year - self.current_year
-            age_at_year = self.current_age + years_since_current
-            experience_at_year = self.years_of_experience + years_since_current
 
-            # Get salary for this year
-            salary_at_year = self.salary_in_the_past_or_future(
+            # Get salary for this year (real and nominal)
+            salary_at_year_real = self.salary_in_the_past_or_future(
                 year_delta=years_since_current, current_salary=self.current_salary
             )
+            salary_at_year_nominal = self.salary_in_the_past_or_future_nominal(
+                year_delta=years_since_current, current_salary=self.current_salary
+            )
+
+            print(f"i_pillar: {i_pillar_total},"
+                  f" ii_pillar: {ii_pillar_total},"
+                  f" total: {i_pillar_total + ii_pillar_total},"
+                  f" annual_salary_real: {salary_at_year_real * Decimal("12")},"
+                  f" annual_salary_nominal: {salary_at_year_nominal * Decimal("12")}")
+
 
             timeline[target_year] = {
                 "i_pillar": i_pillar_total,
                 "ii_pillar": ii_pillar_total,
                 "total": i_pillar_total + ii_pillar_total,
-                "annual_salary": salary_at_year,
+                # Add explicit fields
+                "annual_salary_real": salary_at_year_real * Decimal("12"),
+                "annual_salary_nominal": salary_at_year_nominal * Decimal("12"),
             }
 
         return timeline

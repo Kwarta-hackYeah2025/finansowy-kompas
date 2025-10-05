@@ -12,12 +12,12 @@ router = APIRouter(prefix="/user-profile", tags=["user-profile"])
 
 @router.post("/pension/preview", response_model=PensionPreviewResponse)
 async def pension_preview(payload: PensionPreviewRequest) -> PensionPreviewResponse:
-    current_annual_salary = Decimal(str(payload.current_monthly_salary)) * Decimal("12")
+    current_salary = Decimal(str(payload.current_monthly_salary))
 
     model = PensionModel(
         current_age=payload.current_age,
         years_of_experience=payload.years_of_experience,
-        current_salary=current_annual_salary,
+        current_salary=current_salary,
         is_male=payload.is_male,
         alpha=float(payload.alpha),
         beta=float(payload.beta),
