@@ -10,7 +10,7 @@ class Sex(str, Enum):
     female = "female"
 
 
-def _to_sex_enum(value) -> Sex | None:
+def _too_sexy_enum(value) -> Sex | None:
     if isinstance(value, Sex):
         return value
     if isinstance(value, str):
@@ -55,7 +55,7 @@ class SalaryRequest(BaseModel):
         if data.get("career_end") is not None:
             return data
 
-        sex_enum = _to_sex_enum(data.get("sex"))
+        sex_enum = _too_sexy_enum(data.get("sex"))
         default_age = RETIREMENT_AGE_PL.get(sex_enum) if sex_enum is not None else None
         if default_age is None:
             return data
@@ -85,10 +85,17 @@ class PensionPreviewRequest(BaseModel):
         le=120,
         description="Optional custom retirement age; if omitted, standard age is used",
     )
+    simulation_mode: bool = False
 
 
-from typing import List
-from pydantic import BaseModel, Field
+class SimulationEventDTO(BaseModel):
+    reason: str
+    start_age: int
+    end_age: int
+    basis_zero: bool
+    contrib_multiplier: float
+    kind: str | None = None
+
 
 class TimelinePoint(BaseModel):
     # --- nominal ---
@@ -129,3 +136,5 @@ class PensionPreviewResponse(BaseModel):
 
     # oś czasu
     timeline: List[TimelinePoint] = Field(..., description="Punkty osi czasu do wizualizacji (nominal + real)")
+
+    simulation_events: List[SimulationEventDTO] = []
