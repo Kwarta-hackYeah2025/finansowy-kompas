@@ -4,9 +4,12 @@ from starlette.concurrency import run_in_threadpool
 
 from backend.models.PensionModel import PensionModel
 from backend.models.pension_models.MacroeconomicFactors import MacroeconomicFactors
-from ..schemas import PensionPreviewRequest, PensionPreviewResponse, TimelinePoint
+from backend.api.schemas import PensionPreviewRequest, PensionPreviewResponse, TimelinePoint, SimulationEventDTO
+from backend.llm.random_nonfunctional_periods import NonFunctionalEvent
+from backend.models.nonfunctional_periods.generate_periods import generate_periods
 
 router = APIRouter(prefix="/user-profile", tags=["user-profile"])
+
 
 @router.post("/pension/preview", response_model=PensionPreviewResponse)
 async def pension_preview(payload: PensionPreviewRequest) -> PensionPreviewResponse:
@@ -23,11 +26,44 @@ async def pension_preview(payload: PensionPreviewRequest) -> PensionPreviewRespo
         macroeconomic_factors=MacroeconomicFactors(),
     )
 
+    # --- SIMULATION MODE: generuj i podłącz zdarzenia ---
+    simulation_events: list[NonFunctionalEvent] = []
+    if payload.simulation_mode:
+        birth_year = model.current_year - model.current_age
+        simulation_events = await generate_periods(
+            birth_year=birth_year,
+            current_year=model.current_year,
+            min_events=2,
+            max_events=5,
+        )
+        model.non_functional_events = simulation_events
+
+    # obliczenia
     breakdown = await run_in_threadpool(model.get_detailed_breakdown)
     timeline  = await run_in_threadpool(model.get_timeline_for_visualization)
 
     def _to_2f(x: Decimal) -> float:
         return float(x.quantize(Decimal("0.01")))
+
+    # mapowanie eventów do JSON (frontend-friendly)
+    def _event_to_dict(ev: NonFunctionalEvent) -> SimulationEventDTO:
+        basis_zero = bool(getattr(ev, "basis_zero", False))
+        m = getattr(ev, "contrib_multiplier", None)
+        if basis_zero:
+            cm = 0.0
+        elif m is None:
+            cm = 1.0
+        else:
+            cm = float(m)
+
+        return SimulationEventDTO(
+            reason=str(ev.reason),
+            start_age=int(ev.start_age),
+            end_age=int(ev.end_age),
+            basis_zero=basis_zero,
+            contrib_multiplier=cm,
+            kind=getattr(ev, "kind", None),
+        )
 
     return PensionPreviewResponse(
         retirement_age=int(breakdown["retirement_age"]),
@@ -59,7 +95,7 @@ async def pension_preview(payload: PensionPreviewRequest) -> PensionPreviewRespo
                 ii_pillar=_to_2f(point["ii_pillar_nominal"]),
                 total=_to_2f(point["total_nominal"]),
                 annual_salary=_to_2f(point["annual_salary_nominal"]),
-                # real (dodane pola w schemacie)
+                # real
                 i_pillar_real=_to_2f(point["i_pillar_real"]),
                 ii_pillar_real=_to_2f(point["ii_pillar_real"]),
                 total_real=_to_2f(point["total_real"]),
@@ -67,4 +103,7 @@ async def pension_preview(payload: PensionPreviewRequest) -> PensionPreviewRespo
             )
             for point in timeline
         ],
+
+        # --- SIMULATION EVENTS dla frontu ---
+        simulation_events=[_event_to_dict(e) for e in simulation_events],
     )
