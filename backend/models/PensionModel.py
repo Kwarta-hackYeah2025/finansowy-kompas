@@ -1,24 +1,29 @@
 from datetime import date
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List
 import logging
 
 from pydantic import BaseModel, Field, computed_field
 
 from backend.models.calculate_salary.experience_multiplier import experience_multiplier
+from backend.models.nonfunctional_periods.generate_periods import generate_periods
 from backend.models.pension_models.MacroeconomicFactors import MacroeconomicFactors
 from backend.models.pension_models.RetirementAgeConfig import RetirementAgeConfig
 from backend.models.pension_models.ZUSContributionRates import ZUSContributionRates
+from backend.llm.random_nonfunctional_periods import NonFunctionalEvent
 
 logger = logging.getLogger(__name__)
 
 ONE = Decimal("1")
+
 
 class PensionModel(BaseModel):
     """
     Model spójny z dwiema walutami:
     - NOMINALNA: „ile złotych” w danym roku (z inflacją).
     - REALNA: w stałej sile nabywczej dzisiejszych pieniędzy (po odjęciu inflacji).
+    Zdarzenia (non_functional_events) pozwalają wyzerować lub zredukować podstawę składek
+    w wybranych przedziałach wieku.
     """
 
     # ------------------------------
@@ -44,10 +49,16 @@ class PensionModel(BaseModel):
     )
 
     accumulated_i_pillar_capital: Decimal = Field(
-        default=Decimal("0"), description="Zgromadzony kapitał w I filarze"
+        default=Decimal("0"), description="Zgromadzony kapitał w I filarze (nominalnie)"
     )
     accumulated_ii_pillar_capital: Decimal = Field(
-        default=Decimal("0"), description="Zgromadzony kapitał w II filarze (subkonto)"
+        default=Decimal("0"), description="Zgromadzony kapitał w II filarze (nominalnie)"
+    )
+
+    # --- ZDARZENIA: przerwy/ograniczenia tytułu E+R ---
+    non_functional_events: List[NonFunctionalEvent] = Field(
+        default_factory=list,
+        description="Okresy nieczynności/redukcji podstawy składek (basis_zero lub multiplier < 1)."
     )
 
     # ------------------------------
@@ -157,6 +168,30 @@ class PensionModel(BaseModel):
         config = RetirementAgeConfig()
         return self.retirement_age or config.get_retirement_age(self.is_male)
 
+    # --- pomocnicze do eventów ---
+    @property
+    def birth_year(self) -> int:
+        return self.current_year - self.current_age
+
+    def age_in_year(self, year: int) -> int:
+        """Wiek w danym roku kalendarzowym."""
+        return year - self.birth_year
+
+    def contribution_multiplier_for_age(self, age: int) -> Decimal:
+        """
+        Końcowy mnożnik podstawy składek dla danego wieku:
+        - jeśli jakikolwiek event z basis_zero=True pokrywa wiek → 0
+        - w przeciwnym razie min(contrib_multiplier) z pokrywających
+        - brak eventów → 1
+        """
+        applicable = [e for e in self.non_functional_events if e.start_age <= age < e.end_age]
+        if not applicable:
+            return Decimal("1")
+        if any(e.basis_zero for e in applicable):
+            return Decimal("0")
+        min_m = min(e.contrib_multiplier for e in applicable)
+        return Decimal(str(min_m))
+
     # ------------------------------
     # Składki roczne (z miesięcznego brutto)
     # ------------------------------
@@ -219,74 +254,114 @@ class PensionModel(BaseModel):
         return out
 
     # ------------------------------
-    # Rekonstrukcja i projekcja (NOMINALNIE)
+    # Rekonstrukcja i projekcja (NOMINALNIE) — z eventami
     # ------------------------------
     def reconstruct_historical_contributions(self) -> tuple[Decimal, Decimal]:
+        """
+        NOMINAL: składki od nominalnej pensji miesięcznej, modyfikowane przez eventy,
+        zwaloryzowane/indexowane do roku bieżącego.
+        """
         total_i = self.accumulated_i_pillar_capital or Decimal("0")
         total_ii = self.accumulated_ii_pillar_capital or Decimal("0")
 
         for year in range(self.work_start_year, self.current_year):
             year_delta = year - self.current_year
-            salary_nominal = self.salary_in_the_past_or_future_nominal(self.current_salary, year_delta)
-            i_contrib = self.calculate_annual_contribution_i_pillar(salary_nominal)
-            ii_contrib = self.calculate_annual_contribution_ii_pillar(salary_nominal)
+            base_monthly_nom = self.salary_in_the_past_or_future_nominal(self.current_salary, year_delta)
+
+            age_then = self.age_in_year(year)
+            mult = self.contribution_multiplier_for_age(age_then)
+            if mult == 0:
+                continue
+
+            adj_monthly = base_monthly_nom * mult
+            i_contrib = self.calculate_annual_contribution_i_pillar(adj_monthly)
+            ii_contrib = self.calculate_annual_contribution_ii_pillar(adj_monthly)
 
             total_i += self.valorize_i_pillar_capital(i_contrib, year, self.current_year)
             total_ii += self.index_ii_pillar_capital(ii_contrib, year, self.current_year)
         return total_i, total_ii
 
     def project_future_accumulation(self) -> tuple[Decimal, Decimal]:
+        """
+        NOMINAL: projekcja do roku emerytury z eventami, waloryzacja/indexacja do roku emerytury.
+        """
         total_i = Decimal("0")
         total_ii = Decimal("0")
         retirement_year = self.current_year + self.years_to_standard_retirement
 
         for year in range(self.current_year, retirement_year):
             year_delta = year - self.current_year
-            salary_nominal = self.salary_in_the_past_or_future_nominal(self.current_salary, year_delta)
-            i_contrib = self.calculate_annual_contribution_i_pillar(salary_nominal)
-            ii_contrib = self.calculate_annual_contribution_ii_pillar(salary_nominal)
+            base_monthly_nom = self.salary_in_the_past_or_future_nominal(self.current_salary, year_delta)
+
+            age_then = self.age_in_year(year)
+            mult = self.contribution_multiplier_for_age(age_then)
+            if mult == 0:
+                continue
+
+            adj_monthly = base_monthly_nom * mult
+            i_contrib = self.calculate_annual_contribution_i_pillar(adj_monthly)
+            ii_contrib = self.calculate_annual_contribution_ii_pillar(adj_monthly)
 
             total_i += self.valorize_i_pillar_capital(i_contrib, year, retirement_year)
             total_ii += self.index_ii_pillar_capital(ii_contrib, year, retirement_year)
         return total_i, total_ii
 
     # ------------------------------
-    # Rekonstrukcja i projekcja (REALNIE)
+    # Rekonstrukcja i projekcja (REALNIE) — z eventami
     # ------------------------------
     def reconstruct_historical_contributions_real(self) -> tuple[Decimal, Decimal]:
         """
-        Składki od pensji REALNYCH (doświadczenie × real growth), kapitał waloryzowany
-        realnymi stopami (nominalne indexacje oddeflowane inflacją).
+        REAL: składki od pensji REALNYCH (doświadczenie × real growth) z eventami,
+        waloryzowane realnie do roku bieżącego.
         """
         total_i = Decimal("0")
         total_ii = Decimal("0")
 
-        # Dolicz już zgromadzone kapitały – przelicz do realu bieżącego roku
+        # (opcjonalnie) już zgromadzone kapitały — tu bez zmiany, są nominalne na dziś
         if self.accumulated_i_pillar_capital:
-            total_i += self.valorize_i_pillar_capital_real(self.accumulated_i_pillar_capital, self.current_year, self.current_year)
+            total_i += self.valorize_i_pillar_capital_real(self.accumulated_i_pillar_capital,
+                                                           self.current_year, self.current_year)
         if self.accumulated_ii_pillar_capital:
-            total_ii += self.index_ii_pillar_capital_real(self.accumulated_ii_pillar_capital, self.current_year, self.current_year)
+            total_ii += self.index_ii_pillar_capital_real(self.accumulated_ii_pillar_capital,
+                                                          self.current_year, self.current_year)
 
         for year in range(self.work_start_year, self.current_year):
             year_delta = year - self.current_year
-            salary_real = self.salary_in_the_past_or_future_real_with_macro(self.current_salary, year_delta)
-            i_contrib = self.calculate_annual_contribution_i_pillar(salary_real)
-            ii_contrib = self.calculate_annual_contribution_ii_pillar(salary_real)
+            base_monthly_real = self.salary_in_the_past_or_future_real_with_macro(self.current_salary, year_delta)
+
+            age_then = self.age_in_year(year)
+            mult = self.contribution_multiplier_for_age(age_then)
+            if mult == 0:
+                continue
+
+            adj_monthly = base_monthly_real * mult
+            i_contrib = self.calculate_annual_contribution_i_pillar(adj_monthly)
+            ii_contrib = self.calculate_annual_contribution_ii_pillar(adj_monthly)
 
             total_i += self.valorize_i_pillar_capital_real(i_contrib, year, self.current_year)
             total_ii += self.index_ii_pillar_capital_real(ii_contrib, year, self.current_year)
         return total_i, total_ii
 
     def project_future_accumulation_real(self) -> tuple[Decimal, Decimal]:
+        """
+        REAL: projekcja do roku emerytury z eventami, waloryzacja realna do roku emerytury.
+        """
         total_i = Decimal("0")
         total_ii = Decimal("0")
         retirement_year = self.current_year + self.years_to_standard_retirement
 
         for year in range(self.current_year, retirement_year):
             year_delta = year - self.current_year
-            salary_real = self.salary_in_the_past_or_future_real_with_macro(self.current_salary, year_delta)
-            i_contrib = self.calculate_annual_contribution_i_pillar(salary_real)
-            ii_contrib = self.calculate_annual_contribution_ii_pillar(salary_real)
+            base_monthly_real = self.salary_in_the_past_or_future_real_with_macro(self.current_salary, year_delta)
+
+            age_then = self.age_in_year(year)
+            mult = self.contribution_multiplier_for_age(age_then)
+            if mult == 0:
+                continue
+
+            adj_monthly = base_monthly_real * mult
+            i_contrib = self.calculate_annual_contribution_i_pillar(adj_monthly)
+            ii_contrib = self.calculate_annual_contribution_ii_pillar(adj_monthly)
 
             total_i += self.valorize_i_pillar_capital_real(i_contrib, year, retirement_year)
             total_ii += self.index_ii_pillar_capital_real(ii_contrib, year, retirement_year)
@@ -402,36 +477,46 @@ class PensionModel(BaseModel):
         }
 
     # ------------------------------
-    # Oś czasu dla obu walut
+    # Oś czasu dla obu walut (z eventami)
     # ------------------------------
     def get_cumulative_capital_by_year(self) -> dict[int, dict]:
         timeline = {}
         retirement_year = self.current_year + self.years_to_standard_retirement
 
         for target_year in range(self.current_year, retirement_year + 1):
-            # NOMINAL: sumujemy po latach pracy do target_year
+            # NOMINAL: sumujemy po latach pracy do target_year z eventami
             i_nom = Decimal("0")
             ii_nom = Decimal("0")
             for y in range(self.work_start_year, target_year):
                 yd = y - self.current_year
                 sal_nom = self.salary_in_the_past_or_future_nominal(self.current_salary, yd)
-                i_con = self.calculate_annual_contribution_i_pillar(sal_nom)
-                ii_con = self.calculate_annual_contribution_ii_pillar(sal_nom)
-                i_nom += self.valorize_i_pillar_capital(i_con, y, target_year)
-                ii_nom += self.index_ii_pillar_capital(ii_con, y, target_year)
 
-            # REAL: analogicznie, ale pensje realne (z makro), a waloryzacja realna
+                age_then = self.age_in_year(y)
+                mult = self.contribution_multiplier_for_age(age_then)
+                if mult == 0:
+                    continue
+                adj = sal_nom * mult
+
+                i_nom += self.valorize_i_pillar_capital(self.calculate_annual_contribution_i_pillar(adj), y, target_year)
+                ii_nom += self.index_ii_pillar_capital(self.calculate_annual_contribution_ii_pillar(adj), y, target_year)
+
+            # REAL: analogicznie, ale pensje realne i waloryzacja realna
             i_real = Decimal("0")
             ii_real = Decimal("0")
             for y in range(self.work_start_year, target_year):
                 yd = y - self.current_year
                 sal_real = self.salary_in_the_past_or_future_real_with_macro(self.current_salary, yd)
-                i_con_r = self.calculate_annual_contribution_i_pillar(sal_real)
-                ii_con_r = self.calculate_annual_contribution_ii_pillar(sal_real)
-                i_real += self.valorize_i_pillar_capital_real(i_con_r, y, target_year)
-                ii_real += self.index_ii_pillar_capital_real(ii_con_r, y, target_year)
 
-            # Pensje w roku target_year
+                age_then = self.age_in_year(y)
+                mult = self.contribution_multiplier_for_age(age_then)
+                if mult == 0:
+                    continue
+                adj = sal_real * mult
+
+                i_real += self.valorize_i_pillar_capital_real(self.calculate_annual_contribution_i_pillar(adj), y, target_year)
+                ii_real += self.index_ii_pillar_capital_real(self.calculate_annual_contribution_ii_pillar(adj), y, target_year)
+
+            # Pensje w roku target_year (bez redukcji eventem — do referencji/wykresu)
             yrs_since = target_year - self.current_year
             sal_nom_year  = self.salary_in_the_past_or_future_nominal(self.current_salary, yrs_since)
             sal_real_year = self.salary_in_the_past_or_future_real_with_macro(self.current_salary, yrs_since)
@@ -456,21 +541,38 @@ class PensionModel(BaseModel):
 
 
 if __name__ == "__main__":
-    pension = PensionModel(
-        current_age=30,
-        years_of_experience=10,
-        current_salary=Decimal("30000"),  # miesięcznie, nominalnie
-        is_male=True,
-        alpha=0.02,
-        beta=0.02,
-        macroeconomic_factors=MacroeconomicFactors(
-            inflation_rate=Decimal("0.02"),
-            real_wage_growth_rate=Decimal("0.02"),
-            i_pillar_indexation_rate=Decimal("0.02"),
-            ii_pillar_indexation_rate=Decimal("0.02"),
+    import asyncio
+
+    async def main():
+        pension = PensionModel(
+            current_age=30,
+            years_of_experience=10,
+            current_salary=Decimal("30000"),
+            is_male=True,
+            alpha=0.02,
+            beta=0.02,
+            macroeconomic_factors=MacroeconomicFactors(
+                inflation_rate=Decimal("0.02"),
+                real_wage_growth_rate=Decimal("0.02"),
+                i_pillar_indexation_rate=Decimal("0.02"),
+                ii_pillar_indexation_rate=Decimal("0.02"),
+            ),
         )
-    )
-    breakdown = pension.get_detailed_breakdown()
-    print(breakdown)
-    timeline = pension.get_timeline_for_visualization()
-    print(timeline[:2], "...", timeline[-1] if timeline else None)
+
+        birth_year = pension.current_year - pension.current_age
+
+        events = await generate_periods(birth_year=birth_year, current_year=pension.current_year)
+
+        pension.non_functional_events = events
+
+        print("=== Wygenerowane przerwy (LLM) ===")
+        for e in events:
+            print(f"- {e.reason} | wiek {e.start_age}–{e.end_age} | mnożnik składek {e.contrib_multiplier}")
+
+        breakdown = pension.get_detailed_breakdown()
+        print(breakdown)
+        timeline = pension.get_timeline_for_visualization()
+        print(timeline[:2], "...", timeline[-1] if timeline else None)
+
+
+    asyncio.run(main())
