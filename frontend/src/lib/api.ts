@@ -131,3 +131,18 @@ export async function postExcel(payload: ExcelPayload): Promise<ExcelResponse> {
   const res = await api.post(url, payload)
   return (res.data as ExcelResponse) ?? { ok: true }
 }
+
+// Fun facts
+export type FunFactsResponse = {
+  facts: Array<{ fact: string }>
+}
+
+export async function getFunFacts(): Promise<string[]> {
+  const url = apiUrl(endpoints.funFacts)
+  const res = await api.get(url)
+  const data = res.data as FunFactsResponse
+  const arr = Array.isArray(data?.facts) ? data.facts : []
+  return arr
+    .map((f) => (f && typeof f.fact === "string" ? f.fact : ""))
+    .filter((s) => !!s)
+}

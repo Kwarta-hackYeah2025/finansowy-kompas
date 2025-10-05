@@ -15,6 +15,8 @@ import {formatPLN} from "@/lib/utils"
 import {useNavigate} from "react-router"
 import {colors} from "@/lib/colors"
 import { loadRetiringData } from "@/lib/storage"
+import { useQuery } from "@tanstack/react-query"
+import { getFunFacts } from "@/lib/api"
 
 const AVERAGE_PENSION = 3720 // PLN (mock)
 
@@ -81,12 +83,12 @@ const jobsData = [
 	},
 ] as const
 
-const facts = [
+const fallbackFacts = [
 	"Czy wiesz, że najwyższą emeryturę w Polsce otrzymuje mieszkaniec województwa śląskiego – nieprzerwanie pracował przez dziesięciolecia i nie korzystał ze zwolnień lekarskich?",
 	"Czy wiesz, że każdy dodatkowy rok pracy zwiększa Twoją przyszłą emeryturę, bo podnosi sumę zwaloryzowanych składek i skraca okres wypłaty?",
 	"Czy wiesz, że przerwy w karierze (np. bezrobocie) mogą obniżyć przyszłe świadczenie przez brak składek?",
 	"Czy wiesz, że średnia emerytura w Polsce różni się między regionami – wpływ mają wynagrodzenia i struktura zatrudnienia?",
-]
+] as const
 
 const chartConfig = {
 	median: {
@@ -97,11 +99,48 @@ const chartConfig = {
 
 export default function Info() {
 	const [desired, setDesired] = React.useState<number>(5000)
-	const [fact, setFact] = React.useState<string>(facts[Math.floor(Math.random() * facts.length)])
-	const navigate = useNavigate()
+ const [fact, setFact] = React.useState<string>("")
+ const [displayedFact, setDisplayedFact] = React.useState<string>("")
+ const navigate = useNavigate()
+
+ 	// Pobierz ciekawostki z API
+ 	const { data: funFacts, isLoading: factsLoading, isError: factsError, refetch: refetchFacts } = useQuery({
+ 		queryKey: ["fun-facts"],
+ 		queryFn: getFunFacts,
+ 	})
 
 	const diff = desired - AVERAGE_PENSION
-	const diffLabel = diff >= 0 ? `+${formatPLN(diff)}` : `${formatPLN(diff)}`
+ const diffLabel = diff >= 0 ? `+${formatPLN(diff)}` : `${formatPLN(diff)}`
+
+ 	// Ustaw losową ciekawostkę po załadowaniu danych
+ 	React.useEffect(() => {
+ 		const list = (funFacts && funFacts.length ? funFacts : Array.from(fallbackFacts)) as string[]
+ 		if (!list.length) return
+ 		setFact(prev => (prev && prev.length ? prev : list[Math.floor(Math.random() * list.length)]))
+ 	}, [funFacts])
+
+ 	// Efekt maszyny do pisania (pojawianie się literka po literce)
+ 	React.useEffect(() => {
+ 		let cancelled = false
+ 		setDisplayedFact("")
+ 		const text = fact || ""
+ 		if (!text) return
+ 		let i = 0
+ 		let timer: number | undefined
+ 		const step = () => {
+ 			if (cancelled) return
+ 			i = Math.min(i + 1, text.length)
+ 			setDisplayedFact(text.slice(0, i))
+ 			if (i < text.length) {
+ 				timer = window.setTimeout(step, 18) as unknown as number
+ 			}
+ 		}
+ 		timer = window.setTimeout(step, 18) as unknown as number
+ 		return () => {
+ 			cancelled = true
+ 			if (timer) window.clearTimeout(timer)
+ 		}
+ 	}, [fact])
 
 	const jobsSorted = React.useMemo(() => {
 		return [...jobsData].sort((a, b) => b.median - a.median)
@@ -194,7 +233,16 @@ export default function Info() {
 	}
 
 	const reroll = () => {
-		const next = facts[Math.floor(Math.random() * facts.length)]
+		const list = (funFacts && funFacts.length ? funFacts : Array.from(fallbackFacts)) as string[]
+		if (!list.length) return
+		let next = list[Math.floor(Math.random() * list.length)]
+		if (list.length > 1) {
+			let tries = 0
+			while (next === fact && tries < 10) {
+				next = list[Math.floor(Math.random() * list.length)]
+				tries++
+			}
+		}
 		setFact(next)
 	}
 
@@ -234,8 +282,28 @@ export default function Info() {
 						<CardDescription>Losowy fakt o emeryturach</CardDescription>
 					</CardHeader>
 					<CardContent>
-						<p className="text-sm text-muted-foreground mb-3">{fact}</p>
-						<Button variant="outline" onClick={reroll}>Losuj ciekawostkę</Button>
+						{factsLoading ? (
+							<div className="flex items-center gap-3">
+								<svg className="size-5 animate-spin text-muted-foreground" viewBox="0 0 24 24" aria-hidden="true">
+									<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+									<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+								</svg>
+								<div className="flex-1">
+									<div className="h-2.5 bg-muted/60 rounded w-4/5 mb-2 animate-pulse" />
+									<div className="h-2 bg-muted/50 rounded w-3/5 animate-pulse" />
+								</div>
+							</div>
+						) : (
+							<>
+								<p className="text-sm text-muted-foreground mb-3 whitespace-pre-wrap">{displayedFact}</p>
+								<div className="flex gap-2">
+									<Button variant="outline" onClick={reroll} disabled={!((funFacts?.length ?? 0) || (fallbackFacts.length ?? 0))}>Losuj ciekawostkę</Button>
+									{factsError && (
+										<Button variant="outline" onClick={() => refetchFacts()}>Spróbuj ponownie</Button>
+									)}
+								</div>
+							</>
+						)}
 					</CardContent>
  			</Card>
 			</div>

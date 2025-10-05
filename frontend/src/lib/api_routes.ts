@@ -11,6 +11,7 @@ export const endpoints = {
     preview: "/api/v1/user-profile/pension/preview",
   },
   excel: "/api/v1/excel",
+  funFacts: "/api/v1/fun-facts/",
 } as const
 
 export function apiUrl(path: string) {
