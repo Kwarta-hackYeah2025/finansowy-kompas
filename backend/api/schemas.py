@@ -138,3 +138,7 @@ class PensionPreviewResponse(BaseModel):
     timeline: List[TimelinePoint] = Field(..., description="Punkty osi czasu do wizualizacji (nominal + real)")
 
     simulation_events: List[SimulationEventDTO] = []
+
+
+class FunFactResponse(BaseModel):
+    fact: str = Field(..., description="A fun fact about salaries or pensions")
