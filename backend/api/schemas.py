@@ -129,3 +129,7 @@ class PensionPreviewResponse(BaseModel):
 
     # oś czasu
     timeline: List[TimelinePoint] = Field(..., description="Punkty osi czasu do wizualizacji (nominal + real)")
+
+
+class FunFactResponse(BaseModel):
+    fact: str = Field(..., description="A fun fact about salaries or pensions")
