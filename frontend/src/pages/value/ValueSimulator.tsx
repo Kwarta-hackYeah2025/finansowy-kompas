@@ -18,7 +18,7 @@ const defaultRates = {
 }
 
 const scenarios = {
-  conservative: { label: "Konserwatywny", cpiDaily: 0.03, cpiFood: 0.035, realEstate: 0.025, deposit: 0.025, etf: 0.04 },
+  conservative: { label: "Zachowawczy", cpiDaily: 0.03, cpiFood: 0.035, realEstate: 0.025, deposit: 0.025, etf: 0.04 },
   base: { label: "Bazowy", cpiDaily: 0.05, cpiFood: 0.06, realEstate: 0.04, deposit: 0.03, etf: 0.07 },
   optimistic: { label: "Optymistyczny", cpiDaily: 0.02, cpiFood: 0.025, realEstate: 0.03, deposit: 0.03, etf: 0.09 },
   highInflation: { label: "Wysoka inflacja", cpiDaily: 0.08, cpiFood: 0.1, realEstate: 0.06, deposit: 0.04, etf: 0.07 },

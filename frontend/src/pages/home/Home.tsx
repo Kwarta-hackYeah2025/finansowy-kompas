@@ -7,7 +7,7 @@ import {useNavigate} from "react-router";
 const Home = () => {
 	const navigate = useNavigate();
 	const btnStyles =
-		"px-20 text-2xl h-16 ring-1 ring-white/30 rounded-sm cursor-pointer bg-gradient-to-br from-[#00993f] to-[#007834FF] hover:to-[#ffb34f] transition-colors duration-300";
+		"px-10 md:px-20 text-2xl h-16 ring-1 ring-white/30 rounded-sm cursor-pointer bg-gradient-to-br from-[#00993f] to-[#007834FF] hover:to-[#ffb34f] transition-colors duration-200";
 
 	const slideDown = {
 		hidden: {opacity: 0, y: -100},
@@ -15,7 +15,7 @@ const Home = () => {
 			opacity: 1,
 			y: 20,
 			transition: {
-				delay: i * 0.5,
+				delay: i * 0.2,
 				duration: 1,
 				ease: "easeOut",
 			},
@@ -38,14 +38,14 @@ const Home = () => {
 					{/* Tekst główny */}
 					<div className="backdrop-blur-sm bg-black/35 px-8 pb-8 ring-1 ring-white/30 z-20 w-full">
 						<span
-							className="text-5xl md:text-6xl whitespace-pre-wrap font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-300 via-stone-300 to-amber-300 transition-colors duration-700 hover:from-sky-300 hover:via-emerald-300 hover:to-lime-300">
+							className="text-5xl md:text-6xl whitespace-pre-wrap font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-300 via-stone-300 to-amber-300 transition-colors duration-400 hover:from-sky-300 hover:via-emerald-300 hover:to-lime-300">
 							<span className="text-xl md:text-2xl">Witaj w{'\n'}</span> Finansowym{'\n'} Kompasie!
 						</span>
 					</div>
 
 					{/* Góra → Dół */}
-					<div className="flex w-full justify-center gap-6 md:gap-8 z-10">
-						{["Wartość pieniądza", "Emerytura"].map((text, i) => (
+					<div className="flex-col md:flex-row md:flex w-full justify-center gap-6 md:gap-8 z-10">
+						{["Wartość pieniądza", "Kalkulator emerytury"].map((text, i) => (
 							<motion.div
 								key={text}
 								custom={i}
@@ -54,7 +54,7 @@ const Home = () => {
 								initial="hidden"
 								animate="visible"
 							>
-								<Button className={btnStyles}>{text}</Button>
+								<Button onClick={() => navigate(text === "Wartość pieniądza" ? "/wartosc-pieniadza" : "/informacje")} className={btnStyles}>{text}</Button>
 							</motion.div>
 						))}
 
