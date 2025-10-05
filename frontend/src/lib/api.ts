@@ -42,16 +42,58 @@ export type PensionPreviewPayload = {
   retirement_age: number
 }
 
+// Updated shape to support nominal and real values, while keeping legacy optional fields for compatibility
 export type PensionPreviewResponse = {
   retirement_age: number
   years_to_retirement: number
-  monthly_pension: number
-  replacement_rate_percent: number
-  i_pillar_capital: number
-  ii_pillar_capital: number
-  total_capital: number
-  current_monthly_salary: number
-  timeline: Array<{ year: number; i_pillar: number; ii_pillar: number; total: number; annual_salary: number }>
+
+  // New fields
+  monthly_pension_nominal?: number
+  replacement_rate_percent_nominal?: number
+  i_pillar_capital_nominal?: number
+  ii_pillar_capital_nominal?: number
+  total_capital_nominal?: number
+  current_monthly_salary_nominal?: number
+  final_monthly_salary_nominal?: number
+
+  monthly_pension_real?: number
+  replacement_rate_percent_real?: number
+  i_pillar_capital_real?: number
+  ii_pillar_capital_real?: number
+  total_capital_real?: number
+  final_monthly_salary_real?: number
+
+  // Legacy (pre-nominal/real) optional fields for backward compatibility
+  monthly_pension?: number
+  replacement_rate_percent?: number
+  i_pillar_capital?: number
+  ii_pillar_capital?: number
+  total_capital?: number
+  current_monthly_salary?: number
+
+  timeline: Array<{
+    year: number
+    // Nominal series
+    i_pillar?: number
+    ii_pillar?: number
+    total?: number
+    annual_salary?: number
+    // Real series
+    i_pillar_real?: number
+    ii_pillar_real?: number
+    total_real?: number
+    annual_salary_real?: number
+  }>
+
+  // Simulation events to visualize as segments on the chart
+  simulation_events?: Array<{
+    reason: string
+    start_age: number
+    end_age: number
+    basis_zero: boolean
+    contrib_multiplier: number
+    kind: string
+  }>
 }
 
 export async function postPensionPreview(payload: PensionPreviewPayload): Promise<PensionPreviewResponse> {
