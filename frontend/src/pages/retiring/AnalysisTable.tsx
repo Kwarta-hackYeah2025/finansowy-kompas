@@ -62,7 +62,7 @@ const AnalysisTable = ({data, backend}: { data: any, backend?: SalaryCalculateRe
 					<td className="px-3 py-2 text-muted-foreground">{data.miasto ?? "-"}</td>
 				</tr>
 				<tr className="border-b border-gray-200">
-					<th scope="row" className="text-left font-medium px-3 py-2 border-r border-gray-200">Pensja netto</th>
+					<th scope="row" className="text-left font-medium px-3 py-2 border-r border-gray-200">Pensja netto (podana)</th>
 					<td className="px-3 py-2 text-muted-foreground">
 						{typeof data.pensjaNetto === 'number' ? formatPLN(data.pensjaNetto) : "-"}
 					</td>

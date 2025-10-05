@@ -9,11 +9,12 @@ import {
 	ChartTooltip,
 	ChartTooltipContent
 } from "@/components/ui/chart"
-import {Bar, BarChart, CartesianGrid, Cell, LabelList, XAxis, YAxis} from "recharts"
+import {Bar, BarChart, CartesianGrid, Cell, LabelList, XAxis, YAxis, Line, LineChart} from "recharts"
 import * as React from "react"
 import {formatPLN} from "@/lib/utils"
 import {useNavigate} from "react-router"
 import {colors} from "@/lib/colors"
+import { loadRetiringData } from "@/lib/storage"
 
 const AVERAGE_PENSION = 3720 // PLN (mock)
 
@@ -106,6 +107,65 @@ export default function Info() {
 		return [...jobsData].sort((a, b) => b.median - a.median)
 	}, [])
 
+	// Dane do komponentu: umowa a emerytura
+	const savedForm = React.useMemo(() => (typeof window !== 'undefined' ? loadRetiringData() : null), [])
+	const [salary, setSalary] = React.useState<number>(Math.max(0, Number(savedForm?.pensjaNetto ?? 8000)))
+	const [activity, setActivity] = React.useState<number>(100) // % etatu średnio w karierze
+	const [yearsMax, setYearsMax] = React.useState<number>(45)
+	const ANNUITY_YEARS = 20 // uproszczony okres wypłaty
+	const coeff = React.useMemo(() => ({ uop: 0.16, b2b: 0.06 }), [])
+	const contractConfig = {
+		uop: { label: "UoP (umowa o pracę)", color: colors.green },
+		b2b: { label: "Zlecenie / B2B", color: colors.orange },
+	} satisfies ChartConfig
+	const contractData = React.useMemo(() => {
+		const arr: Array<{ years: number; uop: number; b2b: number }> = []
+		for (let y = 0; y <= yearsMax; y++) {
+			const effYears = y * (activity / 100)
+			const uopVal = (salary * effYears * coeff.uop) / ANNUITY_YEARS
+			const b2bVal = (salary * effYears * coeff.b2b) / ANNUITY_YEARS
+			arr.push({ years: y, uop: Math.max(0, Math.round(uopVal)), b2b: Math.max(0, Math.round(b2bVal)) })
+		}
+		return arr
+	}, [salary, activity, coeff, yearsMax])
+
+	const contractData5 = React.useMemo(() => {
+		const arr = contractData
+		if (!arr.length) return arr
+		const filtered = arr.filter(d => d.years % 5 === 0)
+		const last = arr[arr.length - 1]
+		if (!filtered.length || filtered[filtered.length - 1].years !== last.years) {
+			filtered.push(last)
+		}
+		return filtered
+	}, [contractData])
+
+	// X-axis ticks every ~5 years (ensure last value included)
+	const yearsTicks = React.useMemo(() => {
+		const out: number[] = []
+		const step = 5
+		for (let y = 0; y <= yearsMax; y += step) out.push(y)
+		if (out.length === 0 || out[out.length - 1] !== yearsMax) out.push(yearsMax)
+		return out
+	}, [yearsMax])
+
+	// Required salary (net and approx. gross) to achieve desired pension for each contract
+	const effYearsTotal = React.useMemo(() => Math.max(0, yearsMax * (activity / 100)), [yearsMax, activity])
+	const reqNetUop = React.useMemo(() => {
+		if (!Number.isFinite(desired) || desired <= 0) return 0
+		if (effYearsTotal <= 0 || coeff.uop <= 0) return NaN
+		return (desired * ANNUITY_YEARS) / (effYearsTotal * coeff.uop)
+	}, [desired, effYearsTotal, coeff])
+	const reqNetB2B = React.useMemo(() => {
+		if (!Number.isFinite(desired) || desired <= 0) return 0
+		if (effYearsTotal <= 0 || coeff.b2b <= 0) return NaN
+		return (desired * ANNUITY_YEARS) / (effYearsTotal * coeff.b2b)
+	}, [desired, effYearsTotal, coeff])
+	const approxGrossFromNetUop = (net: number) => (Number.isFinite(net) ? net / 0.72 : NaN)
+	const approxGrossFromNetB2B = (net: number) => (Number.isFinite(net) ? net / 0.8 : NaN)
+	const reqGrossUop = React.useMemo(() => approxGrossFromNetUop(reqNetUop), [reqNetUop])
+	const reqGrossB2B = React.useMemo(() => approxGrossFromNetB2B(reqNetB2B), [reqNetB2B])
+
 	// Interpolate color between blue (max) and navy (min)
 	const hexToRgb = (hex: string) => {
 		const h = hex.replace('#', '')
@@ -177,9 +237,113 @@ export default function Info() {
 						<p className="text-sm text-muted-foreground mb-3">{fact}</p>
 						<Button variant="outline" onClick={reroll}>Losuj ciekawostkę</Button>
 					</CardContent>
-				</Card>
+ 			</Card>
 			</div>
-
+			
+			{/* Nowy komponent: wpływ rodzaju umowy i aktywności na emeryturę */}
+			<Card className="mb-6">
+				<CardHeader>
+					<CardTitle>Umowa a wysokość emerytury</CardTitle>
+					<CardDescription>Porównaj, jak zmienia się szacowana emerytura przy różnym rodzaju umowy oraz poziomie aktywności zawodowej.</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<div className="flex flex-col gap-4">
+						{/* Highlighted required salary section */}
+						<div className="gradient-border  rounded-xl p-[2px]">
+							<div className="rounded-[10px] bg-white p-4">
+								<div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+									<div>
+										<div className="text-xs uppercase tracking-wide text-muted-foreground">Aby osiągnąć emeryturę</div>
+										<div className="text-2xl font-bold">{formatPLN(desired)}</div>
+										<div className="text-xs text-muted-foreground">przy aktywności ok. {Math.round(activity)}% i stażu {Math.round(yearsMax)} lat</div>
+									</div>
+									<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+										<div className="rounded-lg border p-3">
+											<div className="flex items-center justify-between">
+												<span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: `rgba(0, 120, 52, 0.11)`, color: colors.green }}>UoP</span>
+												<span className="text-xs text-muted-foreground">NETTO</span>
+											</div>
+											<div className="text-xl sm:text-2xl font-semibold tabular-nums">
+												{Number.isFinite(reqNetUop) ? formatPLN(reqNetUop) : '—'}
+											</div>
+											<div className="text-xs text-muted-foreground">BRUTTO: <span className="font-medium">{Number.isFinite(reqGrossUop) ? formatPLN(reqGrossUop) : '—'}</span></div>
+										</div>
+										<div className="rounded-lg border p-3">
+											<div className="flex items-center justify-between">
+												<span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: `rgba(255, 179, 79, 0.09)`, color: '#ec9b34' }}>Zlecenie / B2B</span>
+												<span className="text-xs text-muted-foreground">NETTO</span>
+											</div>
+											<div className="text-xl sm:text-2xl font-semibold tabular-nums">
+												{Number.isFinite(reqNetB2B) ? formatPLN(reqNetB2B) : '—'}
+											</div>
+											<div className="text-xs text-muted-foreground">BRUTTO: <span className="font-medium">{Number.isFinite(reqGrossB2B) ? formatPLN(reqGrossB2B) : '—'}</span></div>
+										</div>
+									</div>
+								</div>
+								<div className="text-[11px] text-muted-foreground mt-2">Szacunki bazują na uproszczonym modelu (udział składek w pensji i okres wypłaty). Rzeczywiste podatki i koszty mogą się różnić.</div>
+								</div>
+							</div>
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+ 						<div>
+ 							<label htmlFor="salaryRange" className="text-sm font-medium">Średnie miesięczne zarobki (PLN)</label>
+ 							<div className="flex items-center gap-3">
+ 								<input id="salaryRange" type="range" min={3000} max={30000} step={500} className="w-full" value={salary} onChange={(e) => setSalary(Number(e.target.value || 0))} style={{ accentColor: colors.green }} />
+ 								<Input type="number" inputMode="decimal" min={0} step={100} value={salary} onChange={(e) => setSalary(Number(e.target.value || 0))} />
+ 							</div>
+ 						</div>
+ 						<div>
+ 							<label htmlFor="activity" className="text-sm font-medium">Aktywność zawodowa (średnio % etatu)</label>
+ 							<div className="flex items-center gap-3">
+ 								<input id="activity" type="range" min={20} max={100} step={5} className="w-full" value={activity} onChange={(e) => setActivity(Number(e.target.value || 0))} style={{ accentColor: colors.orange }} />
+ 								<Input type="number" inputMode="numeric" min={0} max={100} step={1} value={activity} onChange={(e) => setActivity(Number(e.target.value || 0))} />
+ 							</div>
+ 						</div>
+ 						<div>
+ 							<label htmlFor="yearsMax" className="text-sm font-medium">Liczba lat pracy</label>
+ 							<div className="flex items-center gap-3">
+ 								<input id="yearsMax" type="range" min={0} max={45} step={1} className="w-full" value={yearsMax} onChange={(e) => setYearsMax(Number(e.target.value || 0))} style={{ accentColor: colors.navy }} />
+ 								<Input type="number" inputMode="numeric" min={0} max={45} step={1} value={yearsMax} onChange={(e) => setYearsMax(Number(e.target.value || 0))} />
+ 							</div>
+ 						</div>
+ 					</div>
+						<ChartContainer config={contractConfig} className="w-full h-[420px]">
+ 						<LineChart data={contractData5} margin={{ left: 16, right: 16, top: 10, bottom: 10 }}>
+								<CartesianGrid strokeDasharray="3 3" />
+								<XAxis dataKey="years" tickMargin={8} ticks={yearsTicks} tickFormatter={(v: number) => `${v} lat`} />
+								<YAxis tickMargin={8} tickFormatter={(v: number) => formatPLN(Number(v))} />
+								<ChartTooltip content={<ChartTooltipContent />} />
+								<Line type="monotone" dataKey="uop" stroke="var(--color-uop)" strokeWidth={2.5} dot={false}>
+									<LabelList dataKey="uop" content={(props: any) => {
+										const { x, y, value } = props
+										if (x == null || y == null) return null
+										return (
+											<text x={x} y={y - 8} textAnchor="middle" fill="var(--color-uop)" fontSize={10}>
+												{formatPLN(Number(value))}
+											</text>
+										)
+									}} />
+								</Line>
+								<Line type="monotone" dataKey="b2b" stroke="var(--color-b2b)" strokeWidth={2.5} dot={false}>
+									<LabelList dataKey="b2b" content={(props: any) => {
+										const { x, y, value } = props
+										if (x == null || y == null) return null
+										return (
+											<text x={x} y={y - 8} textAnchor="middle" fill="var(--color-b2b)" fontSize={10}>
+												{formatPLN(Number(value))}
+											</text>
+										)
+									}} />
+								</Line>
+								<ChartLegend content={<ChartLegendContent />} />
+							</LineChart>
+						</ChartContainer>
+						<p className="text-xs text-muted-foreground">
+							Emerytury poniżej minimalnej: świadczeniobiorcy otrzymujący emeryturę w wysokości poniżej minimalnej wykazywali się niską aktywnością zawodową – nie przepracowali minimum 25 lat (mężczyźni) i 20 lat (kobiety), w związku z tym nie nabyli prawa do gwarancji minimalnej emerytury.
+						</p>
+					</div>
+				</CardContent>
+			</Card>
+			
 			<Card>
 				<CardHeader>
 					<CardTitle>Mediany emerytur dla przykładowych stanowisk</CardTitle>

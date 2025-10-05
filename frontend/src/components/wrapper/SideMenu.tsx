@@ -18,7 +18,7 @@ export function SideMenu({collapsed, toggleCollapse}: SideMenuProps) {
 		<div
 			id="side-menu"
 			data-testid="side-menu"
-			className={`side-zus-bg flex-shrink-0 z-22 h-full min-h-screen border-r border-tertiary transition-all duration-300 overflow-x-hidden ${
+			className={`side-zus-bg flex-shrink-0 z-22 h-screen border-r border-tertiary transition-all duration-300 overflow-x-hidden ${
 				collapsed ? 'w-[65px]' : 'w-64'
 			}`}
 		>

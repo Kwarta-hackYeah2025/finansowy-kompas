@@ -22,7 +22,7 @@ export interface SideMenuItemType {
 export const sideMenuItems: SideMenuItemType[] = [
 	{
 		path: '/informacje',
-		label: 'Informacje',
+		label: 'Kalkulator emerytury',
 		icon: <InfoOutlinedIcon />,
 	},
 	{
@@ -31,30 +31,9 @@ export const sideMenuItems: SideMenuItemType[] = [
 		icon: <SavingsOutlinedIcon />,
 	},
 	{
-		path: '/inflacja',
-		label: 'Inflacja',
-		icon: <AppsIcon />,
-	},
-	{
 		path: '/emerytura',
 		label: 'Emerytura',
 		icon: <ElderlyOutlinedIcon />,
-	},
-	{
-		path: '/ppk',
-		label: 'PPK',
-		icon: <ViewStreamOutlinedIcon />,
-		user: true,
-	},
-	{
-		path: '/gielda',
-		label: 'Giełda',
-		icon: <LiveHelpOutlinedIcon />,
-	},
-	{
-		path: '/lokaty',
-		label: 'Lokaty',
-		icon: <ContactMailOutlinedIcon />,
 	},
 ];
 
