@@ -3,6 +3,7 @@ from typing import Optional
 from typing import List
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from backend.llm.fun_facts.FunFact import FunFact
 
 
 class Sex(str, Enum):
@@ -140,5 +141,17 @@ class PensionPreviewResponse(BaseModel):
     simulation_events: List[SimulationEventDTO] = []
 
 
-class FunFactResponse(BaseModel):
-    fact: str = Field(..., description="A fun fact about salaries or pensions")
+class FunFactsResponse(BaseModel):
+    facts: List[FunFact] = Field(..., description="A fun facts about salaries or pensions")
+
+
+class ExcelRequest(BaseModel):
+    retirement_expected: float = Field(..., description="Emerytura oczekiwana")
+    current_age: int = Field(..., ge=0, le=120, description="Wiek")
+    sex: str = Field(..., description="Płeć")
+    salary: float = Field(..., description="Aktualne wynagrodzenie brutto")
+    simulation_mode: bool = Field(..., description="Czy uwzględniał okresy choroby")
+    total_capital_real: float = Field(..., description="Kapitał łączny I+II (realnie)")
+    monthly_pension_nominal: float = Field(..., description="Miesięczna emerytura nominalna")
+    monthly_pension_real: float = Field(..., description="Miesięczna emerytura realna")
+    zip_code: Optional[str] = Field(None, description="Kod pocztowy")

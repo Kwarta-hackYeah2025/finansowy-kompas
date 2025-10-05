@@ -5,6 +5,8 @@
 \usepackage{tikz}
 \usepackage{listings}
 \usepackage{booktabs}
+\usepackage{subcaption}
+
 
 \title{\includegraphics[trim={1cm 1cm 1cm 1cm}, clip, width=0.3\textwidth]{logo_project}\\[1em] finansowy-kompas.com.pl}
 \subtitle{Rozpocznij analizę\\ swojej przyszłości! \\[-2em]}
@@ -14,53 +16,26 @@
 
 \begin{document}
 
-\include{content/title_and_table_of_contents}
-\include{content/description_of_the_problem}
-\include{content/challenges}
-\include{content/model_and_regressions}
-\include{content/module_summary}
-
-
-
-% ============================================
-\section{Podsumowanie}
-% ============================================
-
-\begin{frame}
-    \frametitle{Użycie modeli w aplikacji}
-    \textbf{Nasz model przeistacza z założenia prosty kalkulator składek emerytalnych
-    w inteligentnego przewodnika po świecie zależności finansowych, który samodzieline sugeruje
-    szereg parametrów!}
-    \\
-    \pause
-    \brand{Normalnie zebranie tego typu danych wymagałoby dużo pracy od użytkownika!}
-\end{frame}
-
-% ============================================
-\section{Co dalej?}
-% ============================================
-
-\begin{frame}
-    $\rightarrow$ \textbf{Nasz system jako MVP demonstruje użyteczność uzyskiwania domyślnych wartości}
-    \begin{itemize}
-        \item Rozwinięcie naszego projektu do formy w pełni funkcjonalnej aplikacji wiązałoby się
-z rozszerzeniem zakresu wartości, które użytkownik może doprecyzowywać --- docelowo,
-użytkownik powinien móc ustawić ręcznie każdy parametr w celu otrzymania realistyczne
-prognozy
-        \item Rozwój projektu poza ramami Hackatonu umożliwiałby też ulepszenie modeli, zakresu i jakości wykorzystanych danych
-i --- w rezultacie --- lepszych modeli
-    \end{itemize}
-\end{frame}
-
-
+\include{contentPL/title_and_table_of_contents}
+\include{contentPL/description_of_the_problem}
+\include{contentPL/challenges}
+\include{contentPL/model_and_regressions}
+\include{contentPL/module_summary}
+\include{contentPL/ending}
 
 % ============================================
 \begin{frame}[plain]
-\Huge Dziękujemy za uwagę!
-
-\vspace{1em}
-\muted{Zespoł Kwarta}
-\includegraphics[width=.5\textwidth]{long_shadow}
+    \hspace{-1cm}
+\noindent\makebox[\linewidth][c]{%
+  \begin{minipage}{\linewidth}
+    \centering
+    \vspace{1cm}
+    {\Huge Dziękujemy za uwagę!}\\[1ex]
+    \vspace{1cm}
+    {\muted{Zespół Kwarta}}\\[2ex]
+    \includegraphics[width=.3\textwidth]{long_shadow}
+  \end{minipage}
+}
 \end{frame}
 
 
