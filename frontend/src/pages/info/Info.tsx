@@ -287,7 +287,7 @@ export default function Info() {
  						<div>
  							<label htmlFor="salaryRange" className="text-sm font-medium">Średnie miesięczne zarobki (PLN)</label>
  							<div className="flex items-center gap-3">
- 								<input id="salaryRange" type="range" min={3000} max={30000} step={500} className="w-full" value={salary} onChange={(e) => setSalary(Number(e.target.value || 0))} style={{ accentColor: colors.green }} />
+ 								<input id="salaryRange" type="range" min={3000} max={50000} step={500} className="w-full" value={salary} onChange={(e) => setSalary(Number(e.target.value || 0))} style={{ accentColor: colors.green }} />
  								<Input type="number" inputMode="decimal" min={0} step={100} value={salary} onChange={(e) => setSalary(Number(e.target.value || 0))} />
  							</div>
  						</div>
@@ -301,8 +301,8 @@ export default function Info() {
  						<div>
  							<label htmlFor="yearsMax" className="text-sm font-medium">Liczba lat pracy</label>
  							<div className="flex items-center gap-3">
- 								<input id="yearsMax" type="range" min={0} max={45} step={1} className="w-full" value={yearsMax} onChange={(e) => setYearsMax(Number(e.target.value || 0))} style={{ accentColor: colors.navy }} />
- 								<Input type="number" inputMode="numeric" min={0} max={45} step={1} value={yearsMax} onChange={(e) => setYearsMax(Number(e.target.value || 0))} />
+ 								<input id="yearsMax" type="range" min={0} max={90} step={1} className="w-full" value={yearsMax} onChange={(e) => setYearsMax(Number(e.target.value || 0))} style={{ accentColor: colors.navy }} />
+ 								<Input type="number" inputMode="numeric" min={0} max={90} step={1} value={yearsMax} onChange={(e) => setYearsMax(Number(e.target.value || 0))} />
  							</div>
  						</div>
  					</div>
