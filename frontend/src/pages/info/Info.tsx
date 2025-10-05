@@ -294,7 +294,7 @@ export default function Info() {
  						<div>
  							<label htmlFor="activity" className="text-sm font-medium">Aktywność zawodowa (średnio % etatu)</label>
  							<div className="flex items-center gap-3">
- 								<input id="activity" type="range" min={20} max={100} step={5} className="w-full" value={activity} onChange={(e) => setActivity(Number(e.target.value || 0))} style={{ accentColor: colors.orange }} />
+ 								<input id="activity" type="range" min={20} max={100} step={5} className="w-full" value={activity} onChange={(e) => setActivity(Number(e.target.value || 0))} style={{ accentColor: '#a8804b' }} />
  								<Input type="number" inputMode="numeric" min={0} max={100} step={1} value={activity} onChange={(e) => setActivity(Number(e.target.value || 0))} />
  							</div>
  						</div>

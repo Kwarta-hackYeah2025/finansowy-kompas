@@ -138,13 +138,57 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 250px;
-    height: 120px;
+    /* Make the CTA container responsive instead of fixed size */
+    width: 100%;
+    max-width: 440px;
+    min-height: 64px;
+    padding: 0.5rem;
+}
+
+/* Subtle pulsing glow/highlight wrapper for important CTAs */
+.pulse-ring {
+    position: relative;
+}
+
+.pulse-ring::before {
+    content: "";
+    position: absolute;
+    inset: -10px;
+    border-radius: 4rem;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+    animation: pulseRing 2.2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: -2; /* behind gradient-border :after (-1) */
+}
+
+
+@keyframes pulseRing {
+    0% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+        transform: scale(0.985);
+        opacity: 0.85;
+    }
+    55% {
+        box-shadow: 0 0 0 18px rgba(34, 197, 94, 0);
+        transform: scale(1.015);
+        opacity: 1;
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+        transform: scale(0.985);
+        opacity: 0.85;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pulse-ring::before {
+        animation: none;
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.35);
+    }
 }
 
 .gradient-border {
-    --borderWidth: 3px;
-    background: #00629f;
+    --borderWidth: 1px;
     position: relative;
     border-radius: var(--borderWidth);
 }
@@ -157,7 +201,7 @@
     height: calc(100% + var(--borderWidth) * 4);
     width: calc(100% + var(--borderWidth) * 4);
     background: linear-gradient(60deg, #f79533, #f37055, #ef4e7b, #a166ab, #5073b8, #1098ad, #07b39b, #6fba82);
-    border-radius: calc(2 * var(--borderWidth));
+    border-radius: 4rem;
     z-index: -1;
     animation: animatedgradient 3s ease alternate infinite;
     background-size: 300% 300%;
