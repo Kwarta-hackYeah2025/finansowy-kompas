@@ -98,6 +98,7 @@ const Analysis = () => {
 	const [zipModalOpen, setZipModalOpen] = React.useState<boolean>(false)
 	const [zipCode, setZipCode] = React.useState<string>("")
 	const excelRequestedRef = React.useRef<boolean>(false)
+	const ZIP_MODAL_LS_KEY = "fk_zip_modal_shown_v1"
 
 	const back = () => navigate("/emerytura")
 
@@ -501,10 +502,17 @@ const Analysis = () => {
 		return payload
 	}
 
-	// Open ZIP modal 3s after preview is available (only once)
+	// Open ZIP modal 3s after preview is available; show only once per user (localStorage)
 	React.useEffect(() => {
 		if (!preview) return
 		if (excelRequestedRef.current) return
+		let wasShown = false
+		try { wasShown = typeof window !== 'undefined' && localStorage.getItem(ZIP_MODAL_LS_KEY) === '1' } catch {}
+		if (wasShown) {
+			// If already shown before, auto-send the request (without ZIP) once per session
+			sendExcelRequest(undefined)
+			return
+		}
 		const t = setTimeout(() => setZipModalOpen(true), 3000)
 		return () => clearTimeout(t)
 	}, [preview])
@@ -668,7 +676,7 @@ const Analysis = () => {
 							<EventsPanel/>
 
 							<div className="flex flex-col gap-6 bg-white rounded-lg border p-4">
-								<ChartContainer config={chartConfig} className="w-full aspect-[16/10]">
+								<ChartContainer config={chartConfig} className="w-full aspect-[16/20] md:aspect-[16/8]">
 									<AreaChart data={points5} margin={{left: 16, right: 44, top: 10, bottom: 10}}>
 										<defs>
 											<linearGradient id={gradAnnual} x1="0" y1="0" x2="0" y2="1">

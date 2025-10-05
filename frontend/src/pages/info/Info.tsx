@@ -381,26 +381,52 @@ export default function Info() {
 								<YAxis tickMargin={8} tickFormatter={(v: number) => formatPLN(Number(v))} />
 								<ChartTooltip content={<ChartTooltipContent />} />
 								<Line type="monotone" dataKey="uop" stroke="var(--color-uop)" strokeWidth={2.5} dot={false}>
-									<LabelList dataKey="uop" content={(props: any) => {
-										const { x, y, value } = props
-										if (x == null || y == null) return null
-										return (
-											<text x={x} y={y - 8} textAnchor="middle" fill="var(--color-uop)" fontSize={10}>
-												{formatPLN(Number(value))}
-											</text>
-										)
-									}} />
+ 								<LabelList dataKey="uop" content={(props: any) => {
+ 									const { x, y, value } = props
+ 									if (x == null || y == null) return null
+ 									const label = formatPLN(Number(value))
+ 									const fontSize = 14
+ 									const paddingX = 6
+ 									const paddingY = 4
+ 									const charWidth = fontSize * 0.6
+ 									const textWidth = Math.max(20, label.length * charWidth)
+ 									const w = textWidth + paddingX * 2
+ 									const h = fontSize + paddingY * 2
+ 									const rectX = x - w / 2
+ 									const rectY = (y - 8) - h / 2
+ 									return (
+ 										<g pointerEvents="none">
+  										<rect x={rectX} y={rectY} width={w} height={h} fill="#fff" stroke="var(--color-uop)" strokeWidth={1} rx={4} ry={4} />
+  										<text x={x} y={y - 8} textAnchor="middle" fill="var(--color-uop)" fontSize={14} dominantBaseline="middle">
+ 												{label}
+ 											</text>
+ 										</g>
+ 									)
+ 								}} />
 								</Line>
 								<Line type="monotone" dataKey="b2b" stroke="var(--color-b2b)" strokeWidth={2.5} dot={false}>
 									<LabelList dataKey="b2b" content={(props: any) => {
 										const { x, y, value } = props
 										if (x == null || y == null) return null
-										return (
-											<text x={x} y={y - 8} textAnchor="middle" fill="var(--color-b2b)" fontSize={10}>
-												{formatPLN(Number(value))}
-											</text>
-										)
-									}} />
+ 									const label = formatPLN(Number(value))
+ 									const fontSize = 14
+ 									const paddingX = 6
+ 									const paddingY = 4
+ 									const charWidth = fontSize * 0.6
+ 									const textWidth = Math.max(20, label.length * charWidth)
+ 									const w = textWidth + paddingX * 2
+ 									const h = fontSize + paddingY * 2
+ 									const rectX = x - w / 2
+ 									const rectY = (y - 8) - h / 2
+ 									return (
+ 										<g pointerEvents="none">
+  										<rect x={rectX} y={rectY} width={w} height={h} fill="#fff" stroke="var(--color-b2b)" strokeWidth={1} rx={4} ry={4} />
+  										<text x={x} y={y - 8} textAnchor="middle" fill="var(--color-b2b)" fontSize={14} dominantBaseline="middle">
+ 												{label}
+ 											</text>
+ 										</g>
+ 									)
+ 								}} />
 								</Line>
 								<ChartLegend content={<ChartLegendContent />} />
 							</LineChart>
