@@ -7,6 +7,9 @@ export const endpoints = {
   salary: {
     calculate: "/api/v1/salary/calculate",
   },
+  pension: {
+    preview: "/api/v1/user-profile/pension/preview",
+  },
 } as const
 
 export function apiUrl(path: string) {
