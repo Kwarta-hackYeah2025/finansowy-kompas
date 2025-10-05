@@ -3,6 +3,7 @@ from typing import Optional
 from typing import List
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from backend.llm.fun_facts.FunFact import FunFact
 
 
 class Sex(str, Enum):
@@ -140,5 +141,5 @@ class PensionPreviewResponse(BaseModel):
     simulation_events: List[SimulationEventDTO] = []
 
 
-class FunFactResponse(BaseModel):
-    fact: str = Field(..., description="A fun fact about salaries or pensions")
+class FunFactsResponse(BaseModel):
+    facts: List[FunFact] = Field(..., description="A fun facts about salaries or pensions")
