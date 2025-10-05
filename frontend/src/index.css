@@ -144,7 +144,7 @@
 
 .gradient-border {
     --borderWidth: 3px;
-    background: #1D1F20;
+    background: #00629f;
     position: relative;
     border-radius: var(--borderWidth);
 }

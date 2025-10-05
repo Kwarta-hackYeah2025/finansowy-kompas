@@ -6,7 +6,7 @@ import {Button} from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
 import {Label} from "@/components/ui/label"
 import { retiringSchema, type RetiringFormValues, defaultRetiringValues } from "@/pages/retiring/schema"
-import { loadRetiringData, saveRetiringData, removeRetiringData } from "@/lib/storage"
+import { loadRetiringData, saveRetiringData, removeRetiringData, saveRetiringCoefficients } from "@/lib/storage"
 import * as React from "react"
 import { useMutation } from "@tanstack/react-query"
 import { postSalaryCalculate } from "@/lib/api"
@@ -35,9 +35,15 @@ const Retiring = () => {
         city: values.miasto,
         industry: values.stanowisko, // map stanowisko to industry
         career_start: values.career_start,
+        career_end: values.wiekEmerytura,
       })
     },
     onSuccess: (data: SalaryCalculateResponse) => {
+      const a = (data as any)?.alpha
+      const b = (data as any)?.beta
+      if (Number.isFinite(a) && Number.isFinite(b)) {
+        saveRetiringCoefficients({ alpha: Number(a), beta: Number(b) })
+      }
       toast.success("Dane wysłane. Przechodzę do analizy.")
       navigate("/emerytura/analiza", { state: { ...form.getValues(), backend: data } })
     },
@@ -46,6 +52,17 @@ const Retiring = () => {
       toast.error("Nie udało się wysłać danych", { description: String(msg) })
     },
   })
+
+  // Save coefficients (alpha, beta) if present and valid
+  React.useEffect(() => {
+    if (!mutation.isSuccess) return
+    const d = mutation.data as SalaryCalculateResponse | undefined
+    const a = (d as any)?.alpha
+    const b = (d as any)?.beta
+    if (Number.isFinite(a) && Number.isFinite(b)) {
+      saveRetiringCoefficients({ alpha: Number(a), beta: Number(b) })
+    }
+  }, [mutation.isSuccess])
 
   // Debounced auto-save on change
   React.useEffect(() => {
@@ -79,7 +96,7 @@ const Retiring = () => {
 	const {register, handleSubmit, formState: {errors, isSubmitting}} = form
 
 	return (
-		<div className="mx-auto w-full max-w-4xl mt-10">
+		<div className="mx-auto w-full max-w-4xl">
 			<Card className="bg-stone-50 pt-0 pb-8">
 				<CardHeader className="bg-white pt-4 rounded-t-xl border-b">
 					<CardTitle className="text-2xl">Wpisz podstawowe dane aby przeanalizować Twoją przyszłość</CardTitle>

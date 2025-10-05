@@ -7,7 +7,7 @@
 \usepackage{booktabs}
 
 \title{\includegraphics[trim={1cm 1cm 1cm 1cm}, clip, width=0.3\textwidth]{logo_project}\\[1em] finansowy-kompas.com.pl}
-\subtitle{Bezpiecznie przeprowadzi cię\\ przez gąszcz własnych finansów \\[-2em]}
+\subtitle{Rozpocznij analizę\\ swojej przyszłości! \\[-2em]}
 %\author{Kwarta}
 \institute{\includegraphics[trim={1.1cm 1.1cm 1.1cm 1.1cm}, clip, width=0.07\textwidth]{long_shadow}\\ Kwarta}
 \date{\today}
@@ -17,26 +17,113 @@
 \include{content/titlepage}
 
 % ============================================
-\section{Basic Elements}
+\section{Opis problemu}
 % ============================================
 
 \begin{frame}
-\frametitle{Lists and Emphasis}
-\framesubtitle{Utilizing color hierarchy}
+\frametitle{Stan kalkulatorów emerytalnych na 2025 rok}
+\includegraphics[width=.8\textwidth]{img/zus_calculator_01}
+\end{frame}
 
-\textbf{Unordered Lists:}
+\begin{frame}
+\frametitle{Stan kalkulatorów emerytalnych na 2025 rok}
+\includegraphics[width=.8\textwidth]{img/zus_calculator_02}
+\end{frame}
+
+\begin{frame}
+\frametitle{Stan kalkulatorów emerytalnych na 2025 rok}
+\includegraphics[width=.8\textwidth]{img/zus_calculator_03}
+\end{frame}
+
+% ============================================
+\section{Konkretyzacja wyzwań}
+% ============================================
+
+\begin{frame}
+\textbf{Plątanina nieznanych pojęć:}
+    \pause
 \begin{itemize}
-    \item First level uses \brand{primary} color
-    \begin{itemize}
-        \item Second level uses primaryLight
-        \begin{itemize}
-            \item Third level uses textSecondary
-        \end{itemize}
-    \end{itemize}
+    \item nie wiadomo, od czego zacząć
+    \pause
+    \item wyjaśnienia \emph{ignotum per ignotum}, często zapętlone
+    \pause
+    \item każdy indywidualny przypadek jest inny --- nie ma jednego wzorca, uniwersalnego wzoru
 \end{itemize}
 \end{frame}
 
-\section{Ordered lists}
+\begin{frame}
+\frametitle{Wybrane technologie i metody analizy danych}
+\textbf{Wykorzystujemy nowoczesne narzędzia, które umożliwiają nam zaradzeniu każdemu z tych wyzwań!}
+    \pause
+\begin{itemize}
+    \item Zebrane dane historyczne (inflacja, wskaźnik PKB itp.)
+    \pause
+    \item Modele uczenia maszynowego przewidujące i klasyfikujące przyrost wynagrodzenia wynikający z progresji kariery
+    \pause
+    \item Modele językowe LLM wspomagane wyszukiwaniem zasobów sieciowych RAG
+\end{itemize}
+\end{frame}
+
+% ============================================
+\section{Modele i regresje}
+% ============================================
+
+\begin{frame}
+    \frametitle{Model ML}
+    \begin{equation}
+    k(x) = 1 + \alpha (1 - e^{-\beta x})
+    \end{equation}
+    \pause
+    $x$ --- lata doświadczenia w zawodzie
+    \pause
+    $\textrm{pensja} \pause = \textrm{pensja juniora} \pause \cdot k(x)$
+\end{frame}
+
+\begin{frame}[plain]
+    \includegraphics[width=.8\textwidth]{img/experience_multiplier}
+\end{frame}
+
+\begin{frame}
+\centering
+\begin{tabular}{cc}
+    \pause
+\includegraphics[width=0.45\linewidth]{img/salary_progression2} &
+    \pause
+\includegraphics[width=0.45\linewidth]{img/salary_progression4} \\
+    \pause
+\includegraphics[width=0.45\linewidth]{img/salary_progression6} &
+    \pause
+\includegraphics[width=0.45\linewidth]{img/salary_progression7}
+\end{tabular}
+\end{frame}
+
+\begin{frame}
+\frametitle{LLM i RAG}
+    \textbf{Wykorzystując API Gemini możemy dokonać klasyfikacji dowolnego zawodu do jendego,
+        z uprzednio wytrenowanych modeli.}
+    \\
+    \pause
+    \brand{Przy użyciu technologii RAG (\emph{Retrieval-Augmented Generation})
+    znajdujemy aktualną stawkę świeżo zatrudnionego juniora danej branży}
+    \\
+    \pause
+    \highlight{Dokładając model czynników makroekonomicznych takich, jak inflacja czy przyrost PKB
+    jesteśmy w stanie sensownie oszacować całą finansową historię użytkownika - zarówno przeszłą jak i przyszłą!}
+\end{frame}
+
+% ============================================
+\section{Rezultat}
+% ============================================
+
+\begin{frame}
+    \frametitle{Użycie modeli w aplikacji}
+    \textbf{Nasz model pozwala przeistoczyć prosty kalkulator składek emerytalnych
+    w inteligentnego przewodnika po świecie zależności finansowych, który samodzieline sugeruje
+    szereg parametrów!}
+    \\
+    \pause
+    \brand{Normalnie zebranie tego typu danych wymagałoby przegrzebania }
+\end{frame}
 
 \begin{frame}
 \textbf{Ordered Lists:}

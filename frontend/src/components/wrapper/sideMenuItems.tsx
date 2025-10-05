@@ -3,6 +3,8 @@ import ContactMailOutlinedIcon from '@mui/icons-material/ContactMailOutlined';
 import LiveHelpOutlinedIcon from '@mui/icons-material/LiveHelpOutlined';
 import ViewStreamOutlinedIcon from '@mui/icons-material/ViewStreamOutlined';
 import ElderlyOutlinedIcon from '@mui/icons-material/ElderlyOutlined';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import SavingsOutlinedIcon from '@mui/icons-material/SavingsOutlined';
 import { type ReactNode } from 'react';
 
 /**
@@ -19,30 +21,19 @@ export interface SideMenuItemType {
 
 export const sideMenuItems: SideMenuItemType[] = [
 	{
-		path: '/inflacja',
-		label: 'Inflacja',
-		icon: <AppsIcon />,
+		path: '/informacje',
+		label: 'Kalkulator emerytury',
+		icon: <InfoOutlinedIcon />,
+	},
+	{
+		path: '/wartosc-pieniadza',
+		label: 'Wartość pieniądza',
+		icon: <SavingsOutlinedIcon />,
 	},
 	{
 		path: '/emerytura',
 		label: 'Emerytura',
 		icon: <ElderlyOutlinedIcon />,
-	},
-	{
-		path: '/ppk',
-		label: 'PPK',
-		icon: <ViewStreamOutlinedIcon />,
-		user: true,
-	},
-	{
-		path: '/gielda',
-		label: 'Giełda',
-		icon: <LiveHelpOutlinedIcon />,
-	},
-	{
-		path: '/lokaty',
-		label: 'Lokaty',
-		icon: <ContactMailOutlinedIcon />,
 	},
 ];
 

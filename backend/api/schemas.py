@@ -87,21 +87,45 @@ class PensionPreviewRequest(BaseModel):
     )
 
 
+from typing import List
+from pydantic import BaseModel, Field
+
 class TimelinePoint(BaseModel):
-    year: int
-    i_pillar: float
-    ii_pillar: float
-    total: float
-    annual_salary: float
+    # --- nominal ---
+    year: int = Field(..., description="Rok")
+    i_pillar: float = Field(..., description="Skumulowany kapitał I filara (nominalnie) do końca roku")
+    ii_pillar: float = Field(..., description="Skumulowany kapitał II filara (nominalnie) do końca roku")
+    total: float = Field(..., description="Suma kapitału I+II (nominalnie) do końca roku")
+    annual_salary: float = Field(..., description="Roczna pensja w danym roku (nominalnie)")
+
+    # --- real ---
+    i_pillar_real: float = Field(..., description="Skumulowany kapitał I filara (realnie) do końca roku")
+    ii_pillar_real: float = Field(..., description="Skumulowany kapitał II filara (realnie) do końca roku")
+    total_real: float = Field(..., description="Suma kapitału I+II (realnie) do końca roku")
+    annual_salary_real: float = Field(..., description="Roczna pensja w danym roku (realnie)")
 
 
 class PensionPreviewResponse(BaseModel):
-    retirement_age: int
-    years_to_retirement: int
-    monthly_pension: float
-    replacement_rate_percent: float
-    i_pillar_capital: float
-    ii_pillar_capital: float
-    total_capital: float
-    current_monthly_salary: float
-    timeline: List[TimelinePoint]
+    # metadane
+    retirement_age: int = Field(..., description="Wiek przejścia na emeryturę")
+    years_to_retirement: int = Field(..., description="Liczba lat do emerytury")
+
+    # --- NOMINAL ---
+    monthly_pension_nominal: float = Field(..., description="Miesięczna emerytura w cenach nominalnych")
+    replacement_rate_percent_nominal: float = Field(..., description="Replacement rate w % (nominalnie)")
+    i_pillar_capital_nominal: float = Field(..., description="Kapitał I filara na starcie emerytury (nominalnie)")
+    ii_pillar_capital_nominal: float = Field(..., description="Kapitał II filara na starcie emerytury (nominalnie)")
+    total_capital_nominal: float = Field(..., description="Kapitał łączny I+II (nominalnie)")
+    current_monthly_salary_nominal: float = Field(..., description="Obecna miesięczna pensja (nominalnie)")
+    final_monthly_salary_nominal: float = Field(..., description="Miesięczna pensja w roku emerytury (nominalnie)")
+
+    # --- REAL ---
+    monthly_pension_real: float = Field(..., description="Miesięczna emerytura w stałych cenach (realnie)")
+    replacement_rate_percent_real: float = Field(..., description="Replacement rate w % (realnie)")
+    i_pillar_capital_real: float = Field(..., description="Kapitał I filara na starcie emerytury (realnie)")
+    ii_pillar_capital_real: float = Field(..., description="Kapitał II filara na starcie emerytury (realnie)")
+    total_capital_real: float = Field(..., description="Kapitał łączny I+II (realnie)")
+    final_monthly_salary_real: float = Field(..., description="Miesięczna pensja w roku emerytury (realnie)")
+
+    # oś czasu
+    timeline: List[TimelinePoint] = Field(..., description="Punkty osi czasu do wizualizacji (nominal + real)")

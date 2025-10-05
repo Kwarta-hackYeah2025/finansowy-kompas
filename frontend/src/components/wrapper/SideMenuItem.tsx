@@ -31,12 +31,12 @@ export function SideMenuItem({
 				}
 			>
 				{icon && (
-					<span className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
-            {icon}
+					<span className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-green-800">
+						{icon}
           </span>
 				)}
 				<span
-					className={`ml-4 overflow-hidden transition-all duration-300 ${
+					className={`ml-4 overflow-hidden text-stone-800 transition-all duration-300 ${
 						collapsed ? 'w-0 opacity-0 ml-0' : 'w-full opacity-100'
 					}`}
 				>
